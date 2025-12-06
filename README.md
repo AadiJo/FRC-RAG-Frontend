@@ -1,6 +1,6 @@
 # FRC RAG (Frontend) - Retrieval-Augmented Generation for FIRST Robotics
 
-A production-ready Retrieval-Augmented Generation (RAG) system designed for FIRST Robotics Competition teams. Features query processing, game piece mapping, caching, and scalable deployment architecture.
+The responsive web interface for the FRC RAG platform. Built with React and modern UI libraries, it enables teams to intuitively query the RAG, visualize historical mechanism solutions, and seamlessly contribute to the shared knowledge base.
 
 ## Problem Statement
 
