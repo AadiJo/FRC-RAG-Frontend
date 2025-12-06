@@ -4,9 +4,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useChat } from "@ai-sdk/react";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -14,10 +12,9 @@ import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check,
 
 type Message = {
   id: string;
-  role: string;
+  role: 'user' | 'assistant';
   content: string;
   images?: any[];
-  isLoading?: boolean;
   metadata?: {
     matched_pieces?: string[];
     enhanced_query?: string;
@@ -27,75 +24,16 @@ type Message = {
 };
 
 export function ChatInterface({ isGuest }: { isGuest: boolean }) {
-  const chatHelpers = useChat({
-    onError: (error) => {
-      console.error("Chat error:", error);
-    }
-  }) as any;
-  
-  const { messages: aiMessages, append, sendMessage, status, stop } = chatHelpers;
-  
-  // Derive isLoading from status (status can be 'idle', 'loading', 'streaming', 'error')
-  const isLoading = status === 'loading' || status === 'submitted' || status === 'streaming';
-
-  // Merge metadata from data stream into messages
-  const messages = useMemo<Message[]>(() => {
-    return aiMessages.map((msg: any, index: number) => {
-      const isLast = index === aiMessages.length - 1;
-      
-      // Handle content being string, array of parts, or parts property (UI Message format)
-      let content = '';
-      let images: any[] = [];
-      let metadata: any = undefined;
-      
-      if (typeof msg.content === 'string') {
-        content = msg.content;
-      } else if (Array.isArray(msg.parts)) {
-        // UI Message format - messages have .parts array
-        for (const part of msg.parts) {
-          if (part.type === 'text') {
-            content += part.text || '';
-          } else if (part.type === 'data-metadata' && part.data) {
-            // Custom data part with metadata
-            metadata = part.data;
-            images = part.data.images || [];
-          } else if (part.type && part.type.startsWith('data-') && part.data) {
-            // Any other custom data part
-            if (part.data.images) {
-              images = part.data.images;
-              metadata = part.data;
-            }
-          }
-        }
-      } else if (Array.isArray(msg.content)) {
-        // Legacy format - content is array
-        content = msg.content
-          .map((part: any) => {
-            if (typeof part === 'string') return part;
-            if (part && typeof part === 'object' && 'text' in part) return part.text;
-            return '';
-          })
-          .join('');
-      }
-
-      const msgWithLoading = { 
-        ...msg, 
-        content, 
-        isLoading: isLast && isLoading,
-        images: images.length > 0 ? images : msg.images,
-        metadata: metadata || msg.metadata
-      } as Message;
-
-      return msgWithLoading;
-    });
-  }, [aiMessages, isLoading]);
-
   const { user } = useUser();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingMetadata, setStreamingMetadata] = useState<any>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const isAtBottomRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Settings state
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -108,9 +46,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
   
-  // Track when user sends a message to scroll to it once
-  const [justSentMessage, setJustSentMessage] = useState(false);
-  const prevMessageCountRef = useRef(0);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
   const handleLogout = () => {
     if (isGuest) {
@@ -119,41 +55,177 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const scrollToBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
 
+  const handleScroll = useCallback(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isNearBottom);
+    }
+  }, []);
+
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  const sendMessage = useCallback(async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: messageText
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setStreamingContent("");
+    setStreamingMetadata(null);
+
+    // Build conversation history for backend
+    const conversationHistory = messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    // Build request body
+    const requestBody: any = {
+      query: messageText,
+      conversation_history: conversationHistory,
+      show_reasoning: showReasoning
+    };
+
+    if (apiKey) requestBody.custom_api_key = apiKey;
+    if (model) requestBody.custom_model = model;
+    
     let effectiveSystemPrompt = systemPrompt;
     if (user && user.firstName) {
-      effectiveSystemPrompt += `\n\nThis user's name is ${user.firstName}${user.lastName ? `, ${user.lastName}` : ''}.`;
+      effectiveSystemPrompt += `\n\nThis user's name is ${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}.`;
     }
+    if (effectiveSystemPrompt) requestBody.system_prompt = effectiveSystemPrompt;
 
-    if (sendMessage) {
-      // Use sendMessage with text property for UI Message format
-      sendMessage({ text: input }, {
-        body: { apiKey, model, systemPrompt: effectiveSystemPrompt, showReasoning }
+    // Create abort controller
+    abortControllerRef.current = new AbortController();
+
+    let currentContent = '';
+    let metadata: any = null;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/query/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortControllerRef.current.signal
       });
-    } else if (append) {
-      // Fallback for older versions
-      append({
-        role: 'user',
-        content: input,
-      }, {
-        body: { apiKey, model, systemPrompt: effectiveSystemPrompt, showReasoning }
-      });
-    } else {
-      console.error("No send method available from useChat");
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+
+              if (data.type === 'metadata') {
+                metadata = data.data;
+                setStreamingMetadata(data.data);
+              } else if (data.type === 'content') {
+                currentContent += data.data;
+                setStreamingContent(currentContent);
+              } else if (data.type === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              if (e instanceof SyntaxError) {
+                console.error('Error parsing SSE data:', e, line);
+              } else {
+                throw e;
+              }
+            }
+          }
+        }
+      }
+
+      // Stream complete - add assistant message
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: currentContent,
+        images: metadata?.images,
+        metadata: metadata
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      setStreamingContent("");
+      setStreamingMetadata(null);
+
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // User cancelled - save partial content if any
+        if (currentContent) {
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: currentContent,
+            images: metadata?.images,
+            metadata: metadata
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        }
+      } else {
+        console.error('Stream error:', error);
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: `Error: ${error.message || 'Something went wrong'}`
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+      setStreamingContent("");
+      setStreamingMetadata(null);
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
     }
-    
-    setInput("");
-    setJustSentMessage(true);
+  }, [messages, isLoading, apiKey, model, systemPrompt, showReasoning, apiUrl, user]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input);
     if (textareaRef.current) {
       textareaRef.current.style.height = "40px";
     }
-    // Keep focus on textarea after state updates
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 0);
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -170,89 +242,6 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + "px";
   };
 
-  const handleStop = () => {
-    stop();
-    textareaRef.current?.focus();
-  };
-
-  const scrollToBottom = () => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  const handleScroll = () => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      isAtBottomRef.current = isNearBottom;
-      setShowScrollButton(!isNearBottom);
-    }
-  };
-
-  // Update scroll button visibility when messages change (content grows)
-  useEffect(() => {
-    handleScroll();
-  }, [messages, isLoading]);
-
-  // Scroll to new user message once when sent (not during streaming)
-  useEffect(() => {
-    // Only scroll when a new message is added (not during content streaming)
-    if (justSentMessage && messages.length > prevMessageCountRef.current) {
-      // Find the last user message element and scroll it to the top
-      if (chatContainerRef.current) {
-        // Small delay to ensure the DOM has updated
-        setTimeout(() => {
-          const container = chatContainerRef.current;
-          if (!container) return;
-          
-          // Find all message elements and get the last user message
-          const messageElements = container.querySelectorAll('[data-message-role]');
-          const lastUserMessage = Array.from(messageElements).reverse().find(
-            el => el.getAttribute('data-message-role') === 'user'
-          );
-          
-          if (lastUserMessage) {
-            // Scroll so user message is visible near the top with padding
-            // Use scrollIntoView for more reliable scrolling
-            lastUserMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            
-            // Adjust for padding if needed (scrollIntoView aligns to top edge exactly)
-            // We can do a small adjustment after the scroll starts, but usually block: 'start' is good enough
-            // If we really need the 20px padding, we can use scrollBy or stick to scrollTo
-            // Let's try scrollTo again but ensure we're calculating correctly
-            
-            const messageRect = lastUserMessage.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const offset = messageRect.top - containerRect.top;
-            
-            // If offset is small, we might not need to scroll much
-            if (Math.abs(offset) > 5) {
-               container.scrollTo({
-                top: container.scrollTop + offset - 20,
-                behavior: 'smooth'
-              });
-            }
-            
-            // Show scroll button since we're not at bottom after this scroll
-            setTimeout(() => {
-              handleScroll(); // Re-check scroll position to update button visibility
-            }, 350); // After smooth scroll completes
-          }
-        }, 100);
-      }
-      setJustSentMessage(false);
-    }
-    prevMessageCountRef.current = messages.length;
-  }, [messages.length, justSentMessage]);
-
-  // Check if we're currently waiting for/streaming a response
-  const lastMessage = messages[messages.length - 1];
-  const isStreamingResponse = lastMessage?.role === 'assistant' && isLoading;
-
   // Close tools menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -265,14 +254,14 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  // Find the index of the last user message to group the final turn
-  let lastUserIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') {
-      lastUserIndex = i;
-      break;
+  // Update scroll button visibility when messages change
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isNearBottom);
     }
-  }
+  }, [messages.length]);
 
   return (
     <div className="flex h-screen flex-col bg-[#141414]">
@@ -312,27 +301,19 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto bg-[#141414]"
       >
-        {messages.length === 0 && <WelcomeMessage />}
+        {messages.length === 0 && !isLoading && <WelcomeMessage />}
         
-        {/* Render history messages (before the last user message) */}
-        {lastUserIndex !== -1 ? (
-          <>
-            {messages.slice(0, lastUserIndex).map((msg, i) => (
-              <MessageBubble key={i} message={msg} userImageUrl={user?.imageUrl} />
-            ))}
-            
-            {/* Render the active turn (last user message + response) in a full-height container */}
-            <div className="min-h-full flex flex-col justify-start">
-              {messages.slice(lastUserIndex).map((msg, i) => (
-                <MessageBubble key={lastUserIndex + i} message={msg} userImageUrl={user?.imageUrl} />
-              ))}
-            </div>
-          </>
-        ) : (
-          /* Fallback for when there are no user messages yet */
-          messages.map((msg, i) => (
-            <MessageBubble key={i} message={msg} userImageUrl={user?.imageUrl} />
-          ))
+        {/* Render messages */}
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} userImageUrl={user?.imageUrl} apiUrl={apiUrl} />
+        ))}
+
+        {/* Streaming message */}
+        {isLoading && (
+          <StreamingMessage 
+            content={streamingContent} 
+            metadata={streamingMetadata}
+          />
         )}
       </main>
 
@@ -435,6 +416,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
           setModel={setModel}
           systemPrompt={systemPrompt}
           setSystemPrompt={setSystemPrompt}
+          apiUrl={apiUrl}
         />
       )}
     </div>
@@ -472,12 +454,9 @@ function WelcomeMessage() {
   );
 }
 
-function MessageBubble({ message, userImageUrl }: { message: Message; userImageUrl?: string }) {
-  const isUser = message.role === "user";
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-  // Loading state - show typing indicator
-  if (!isUser && message.isLoading && !message.content) {
+function StreamingMessage({ content, metadata }: { content: string; metadata: any }) {
+  // Show loading indicator when no content yet
+  if (!content) {
     return (
       <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.05)] animate-fadeInUp bg-[#141414]">
         <div className="max-w-3xl mx-auto flex gap-4 items-start">
@@ -495,6 +474,98 @@ function MessageBubble({ message, userImageUrl }: { message: Message; userImageU
       </div>
     );
   }
+
+  return (
+    <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.05)] animate-fadeInUp bg-[#141414]">
+      <div className="max-w-3xl mx-auto flex gap-4 items-start">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center flex-shrink-0">
+          <Bot className="w-4 h-4 text-white" />
+        </div>
+        
+        <div className="flex-1 min-w-0 pt-[0.15rem]">
+          {/* Game piece context chips */}
+          {metadata?.matched_pieces && metadata.matched_pieces.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {metadata.matched_pieces.map((piece: string, idx: number) => (
+                <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                  <Link2 className="w-3 h-3" />
+                  {piece}
+                </span>
+              ))}
+            </div>
+          )}
+          
+          <div className="prose prose-invert max-w-none text-[#ececec] leading-relaxed [&>*:first-child]:mt-0">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+              {content}
+            </ReactMarkdown>
+            <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-0.5 align-middle"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const markdownComponents = {
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse border border-[#424242]">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: any) => <thead className="bg-[#1e1e1e]">{children}</thead>,
+  tbody: ({ children }: any) => <tbody>{children}</tbody>,
+  tr: ({ children }: any) => <tr className="border-b border-[#333]">{children}</tr>,
+  th: ({ children }: any) => (
+    <th className="border border-[#424242] bg-[#1e1e1e] px-3 py-2 text-left font-semibold text-[#ececec]">
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className="border border-[#333] px-3 py-2 text-[#dcdcdc]">
+      {children}
+    </td>
+  ),
+  p: ({ children }: any) => <p className="my-2 text-[#dcdcdc]">{children}</p>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold mt-4 mb-1 text-[#ececec]">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-lg font-bold mt-4 mb-1 text-[#ececec]">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-base font-bold mt-3 mb-1 text-[#ececec]">{children}</h3>,
+  strong: ({ children }: any) => <strong className="font-bold text-[#ececec]">{children}</strong>,
+  ul: ({ className, children }: any) => {
+    const isTaskList = className?.includes('contains-task-list');
+    return <ul className={isTaskList ? "pl-0 my-2 space-y-1 list-none" : "list-disc pl-6 my-2 space-y-1"}>{children}</ul>;
+  },
+  ol: ({ children }: any) => <ol className="list-decimal pl-6 my-2 space-y-1">{children}</ol>,
+  li: ({ className, children }: any) => {
+    const isTaskItem = className?.includes('task-list-item');
+    return <li className={isTaskItem ? "list-none flex items-center gap-2 text-[#b4b4b4]" : "text-[#b4b4b4]"}>{children}</li>;
+  },
+  input: ({ type, checked }: any) => {
+    if (type === 'checkbox') {
+      return (
+        <span className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${checked ? 'bg-blue-500 border-blue-500' : 'border-[#666] bg-transparent'}`}>
+          {checked && <Check className="w-3 h-3 text-white" />}
+        </span>
+      );
+    }
+    return null;
+  },
+  a: ({ href, children }: any) => <a href={href} className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+  blockquote: ({ children }: any) => <blockquote className="border-l-4 border-blue-500 pl-4 my-2 italic text-[#a0a0a0]">{children}</blockquote>,
+  code: ({ className, children }: any) => {
+    const isInline = !className;
+    if (isInline) {
+      return <code className="bg-[#2a2a2a] px-1.5 py-0.5 rounded text-sm text-[#e06c75]">{children}</code>;
+    }
+    return <code className={className}>{children}</code>;
+  },
+  pre: ({ children }: any) => <pre className="bg-[#1e1e1e] p-4 rounded-lg overflow-x-auto my-4 text-sm">{children}</pre>,
+};
+
+function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; userImageUrl?: string; apiUrl: string }) {
+  const isUser = message.role === "user";
 
   // Helper to extract team number and year from web_path like "3255-2025/page11_img0.png"
   const getTeamInfo = (webPath: string) => {
@@ -541,68 +612,7 @@ function MessageBubble({ message, userImageUrl }: { message: Message; userImageU
           )}
           
           <div className="prose prose-invert max-w-none text-[#ececec] leading-relaxed [&>*:first-child]:mt-0">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
-              components={{
-                table: ({ children }) => (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-collapse border border-[#424242]">
-                      {children}
-                    </table>
-                  </div>
-                ),
-                thead: ({ children }) => <thead className="bg-[#1e1e1e]">{children}</thead>,
-                tbody: ({ children }) => <tbody>{children}</tbody>,
-                tr: ({ children }) => <tr className="border-b border-[#333]">{children}</tr>,
-                th: ({ children }) => (
-                  <th className="border border-[#424242] bg-[#1e1e1e] px-3 py-2 text-left font-semibold text-[#ececec]">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-[#333] px-3 py-2 text-[#dcdcdc]">
-                    {children}
-                  </td>
-                ),
-                p: ({ children }) => <p className="my-2 text-[#dcdcdc]">{children}</p>,
-                h1: ({ children }) => <h1 className="text-xl font-bold mt-4 mb-1 text-[#ececec]">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-lg font-bold mt-4 mb-1 text-[#ececec]">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-base font-bold mt-3 mb-1 text-[#ececec]">{children}</h3>,
-                strong: ({ children }) => <strong className="font-bold text-[#ececec]">{children}</strong>,
-                ul: ({ className, children }) => {
-                  // Check if this is a task list (contains checkboxes)
-                  const isTaskList = className?.includes('contains-task-list');
-                  return <ul className={isTaskList ? "pl-0 my-2 space-y-1 list-none" : "list-disc pl-6 my-2 space-y-1"}>{children}</ul>;
-                },
-                ol: ({ children }) => <ol className="list-decimal pl-6 my-2 space-y-1">{children}</ol>,
-                li: ({ className, children }) => {
-                  // Check if this is a task list item
-                  const isTaskItem = className?.includes('task-list-item');
-                  return <li className={isTaskItem ? "list-none flex items-center gap-2 text-[#b4b4b4]" : "text-[#b4b4b4]"}>{children}</li>;
-                },
-                input: ({ type, checked }) => {
-                  if (type === 'checkbox') {
-                    return (
-                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${checked ? 'bg-blue-500 border-blue-500' : 'border-[#666] bg-transparent'}`}>
-                        {checked && <Check className="w-3 h-3 text-white" />}
-                      </span>
-                    );
-                  }
-                  return null;
-                },
-                a: ({ href, children }) => <a href={href} className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
-                blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 my-2 italic text-[#a0a0a0]">{children}</blockquote>,
-                code: ({ className, children }) => {
-                  const isInline = !className;
-                  if (isInline) {
-                    return <code className="bg-[#2a2a2a] px-1.5 py-0.5 rounded text-sm text-[#e06c75]">{children}</code>;
-                  }
-                  return <code className={className}>{children}</code>;
-                },
-                pre: ({ children }) => <pre className="bg-[#1e1e1e] p-4 rounded-lg overflow-x-auto my-4 text-sm">{children}</pre>,
-              }}
-            >
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
               {message.content}
             </ReactMarkdown>
           </div>
@@ -617,7 +627,7 @@ function MessageBubble({ message, userImageUrl }: { message: Message; userImageU
                 {message.images.map((img: any, idx: number) => {
                   const teamInfo = getTeamInfo(img.web_path);
                   return (
-                    <ImageCard key={idx} img={img} teamInfo={teamInfo} apiUrl={apiUrl || ''} />
+                    <ImageCard key={idx} img={img} teamInfo={teamInfo} apiUrl={apiUrl} />
                   );
                 })}
               </div>
@@ -678,7 +688,8 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
-    // Fetch image with proper headers to bypass ngrok warning
+    let objectUrl: string | null = null;
+    
     const loadImage = async () => {
       try {
         const response = await fetch(`${apiUrl}/images/${img.web_path}`, {
@@ -688,7 +699,8 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
         });
         if (!response.ok) throw new Error('Failed to load');
         const blob = await response.blob();
-        setImgSrc(URL.createObjectURL(blob));
+        objectUrl = URL.createObjectURL(blob);
+        setImgSrc(objectUrl);
       } catch (e) {
         setError(true);
       }
@@ -696,7 +708,7 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
     loadImage();
     
     return () => {
-      if (imgSrc) URL.revokeObjectURL(imgSrc);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [apiUrl, img.web_path]);
 
@@ -761,7 +773,8 @@ function SettingsModal({
   model,
   setModel,
   systemPrompt,
-  setSystemPrompt
+  setSystemPrompt,
+  apiUrl
 }: {
   onClose: () => void;
   apiKey: string;
@@ -772,12 +785,12 @@ function SettingsModal({
   setModel: (v: string) => void;
   systemPrompt: string;
   setSystemPrompt: (v: string) => void;
+  apiUrl: string;
 }) {
   const [apiKeyValid, setApiKeyValid] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [models, setModels] = useState<{id: string; name: string; free: boolean}[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
   const DEFAULT_MODEL_NAME = 'GPT-OSS 20B (Server Default)';
 
