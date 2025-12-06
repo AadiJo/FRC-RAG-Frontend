@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 71%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 71%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2f2f2f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #565656;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6f6f6f;
+}
+
+/* Message animations */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Markdown/Prose overrides for dark theme */
+.prose {
+  --tw-prose-body: #ececec;
+  --tw-prose-headings: #ececec;
+  --tw-prose-links: #58a6ff;
+  --tw-prose-bold: #ececec;
+  --tw-prose-counters: #b4b4b4;
+  --tw-prose-bullets: #b4b4b4;
+  --tw-prose-hr: #333;
+  --tw-prose-quotes: #9ca3af;
+  --tw-prose-quote-borders: #3b82f6;
+  --tw-prose-code: #ececec;
+  --tw-prose-pre-code: #ececec;
+  --tw-prose-pre-bg: #0d0d0d;
+  --tw-prose-th-borders: #333;
+  --tw-prose-td-borders: #333;
+}
+
+.prose pre {
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.prose code {
+  background: #1a1a1a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+
+.prose code::before,
+.prose code::after {
+  content: none;
+}
+
+.prose blockquote {
+  border-left-color: #3b82f6;
+  background: #1a1a1a;
+  padding: 10px 12px;
+  border-radius: 4px;
+}
+
+.prose :where(hr):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  border-color: var(--tw-prose-hr);
+  border-top-width: 1px;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.prose a {
+  color: #58a6ff;
+}
+
+.prose strong {
+  color: #ececec;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #ececec;
+}
+
+.prose p {
+  color: #dcdcdc;
+}
+
+.prose :where(table):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  table-layout: auto;
+  width: 100%;
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+  font-size: .875em;
+  line-height: 1.71429;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
