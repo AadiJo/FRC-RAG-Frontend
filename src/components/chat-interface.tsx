@@ -264,7 +264,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   }, [messages.length]);
 
   return (
-    <div className="flex h-screen flex-col bg-[#141414]">
+    <div className="flex min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#141414]">
       {/* Header */}
       <header className="bg-[#141414] border-b border-[#2f2f2f] px-5 py-6 flex items-center justify-center relative">
         <button 
@@ -299,7 +299,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       <main 
         ref={chatContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto bg-[#141414]"
+        className="flex-1 min-h-0 overflow-y-auto bg-[#141414]"
       >
         {messages.length === 0 && !isLoading && <WelcomeMessage />}
         
