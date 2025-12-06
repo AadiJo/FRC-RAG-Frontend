@@ -1,8 +1,23 @@
 import { SignIn } from "@clerk/nextjs";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Page() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#141414]">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#141414] px-4">
+      <div className="absolute left-6 top-6">
+        <Button
+          variant="ghost"
+          className="text-[#ececec] hover:bg-white/10"
+          asChild
+        >
+          <Link href="/" className="flex items-center gap-2" aria-label="Back to landing page">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Link>
+        </Button>
+      </div>
       <SignIn 
         forceRedirectUrl="/"
         appearance={{

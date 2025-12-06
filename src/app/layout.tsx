@@ -25,6 +25,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[Clerk env check]", {
+      hasClientPublishable: !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      hasServerPublishable: !!process.env.CLERK_PUBLISHABLE_KEY,
+      hasSecret: !!process.env.CLERK_SECRET_KEY,
+      publishableMatches:
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === process.env.CLERK_PUBLISHABLE_KEY,
+    });
+  }
+
   return (
     <ClerkProvider
       appearance={{
