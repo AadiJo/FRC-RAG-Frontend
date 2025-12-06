@@ -31,5 +31,5 @@ export default function Home() {
     return <ChatInterface isGuest={!isSignedIn} />;
   }
 
-  return <LandingPage />;
+  return <LandingPage onGuestLogin={() => setIsGuest(true)} />;
 }

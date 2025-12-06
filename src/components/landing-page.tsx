@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Bot } from "lucide-react";
 
-export function LandingPage() {
+export function LandingPage({ onGuestLogin }: { onGuestLogin?: () => void }) {
   const router = useRouter();
   const { signOut } = useClerk();
 
@@ -18,6 +18,9 @@ export function LandingPage() {
       // Ignore errors - user might not be signed in
     }
     document.cookie = "guest-mode=true; path=/; max-age=86400";
+    if (onGuestLogin) {
+      onGuestLogin();
+    }
     router.refresh();
   };
 
