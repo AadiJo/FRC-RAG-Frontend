@@ -8,7 +8,7 @@ import { useState, useRef, useEffect, useCallback, ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu, Plus, Loader2 } from "lucide-react";
+import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu, Plus, Loader2, Globe, Youtube } from "lucide-react";
 
 type Message = {
   id: string;
@@ -20,6 +20,8 @@ type Message = {
     enhanced_query?: string;
     context_sources?: number;
     game_piece_context?: string;
+    external_sources_section?: string;
+    external_sources?: any[];
   };
 };
 
@@ -41,10 +43,40 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const [showApiKey, setShowApiKey] = useState(false);
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [youtubeApiKey, setYoutubeApiKey] = useState("");
+  const [serpApiKey, setSerpApiKey] = useState("");
+  const [showYoutubeKey, setShowYoutubeKey] = useState(false);
+  const [showSerpKey, setShowSerpKey] = useState(false);
   
   // Tools state
   const [toolsOpen, setToolsOpen] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
+  const [youtubeSearch, setYoutubeSearch] = useState(false);
+  const [searchQuota, setSearchQuota] = useState<{remaining: number, limit: number} | null>(null);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('frc_rag_api_key');
+    const savedYoutubeKey = localStorage.getItem('frc_rag_youtube_key');
+    const savedSerpKey = localStorage.getItem('frc_rag_serp_key');
+    if (savedApiKey) setApiKey(savedApiKey);
+    if (savedYoutubeKey) setYoutubeApiKey(savedYoutubeKey);
+    if (savedSerpKey) setSerpApiKey(savedSerpKey);
+  }, []);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    if (apiKey) localStorage.setItem('frc_rag_api_key', apiKey);
+    else localStorage.removeItem('frc_rag_api_key');
+    
+    if (youtubeApiKey) localStorage.setItem('frc_rag_youtube_key', youtubeApiKey);
+    else localStorage.removeItem('frc_rag_youtube_key');
+    
+    if (serpApiKey) localStorage.setItem('frc_rag_serp_key', serpApiKey);
+    else localStorage.removeItem('frc_rag_serp_key');
+  }, [apiKey, youtubeApiKey, serpApiKey]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -183,11 +215,15 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     const requestBody: any = {
       query: messageText,
       conversation_history: conversationHistory,
-      show_reasoning: showReasoning
+      show_reasoning: showReasoning,
+      enable_web_search: webSearch,
+      enable_youtube_search: youtubeSearch
     };
 
     if (apiKey) requestBody.custom_api_key = apiKey;
     if (model) requestBody.custom_model = model;
+    if (youtubeApiKey) requestBody.custom_youtube_key = youtubeApiKey;
+    if (serpApiKey) requestBody.custom_serpapi_key = serpApiKey;
     
     let effectiveSystemPrompt = systemPrompt;
     if (user && user.firstName) {
@@ -238,6 +274,9 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
               if (data.type === 'metadata') {
                 metadata = data.data;
                 setStreamingMetadata(data.data);
+                if (data.data.search_quota) {
+                  setSearchQuota(data.data.search_quota);
+                }
               } else if (data.type === 'content') {
                 currentContent += data.data;
                 setStreamingContent(currentContent);
@@ -296,7 +335,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [messages, isLoading, apiKey, model, systemPrompt, showReasoning, apiUrl, user]);
+  }, [messages, isLoading, apiKey, model, systemPrompt, showReasoning, webSearch, youtubeSearch, youtubeApiKey, serpApiKey, apiUrl, user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,6 +380,65 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       setShowScrollButton(!isNearBottom);
     }
   }, [messages.length]);
+
+  // Fetch quota from backend on page load
+  // Quota fetch function
+  const fetchQuota = async (userId?: string) => {
+    try {
+      const headers: any = { 'ngrok-skip-browser-warning': 'true' };
+      if (userId) headers['X-User-Id'] = userId;
+      let url = `${apiUrl}/api/quota`;
+      // If custom keys, pass as query params
+      const params: string[] = [];
+      if (youtubeApiKey) params.push(`custom_youtube_key=${encodeURIComponent(youtubeApiKey)}`);
+      if (serpApiKey) params.push(`custom_serpapi_key=${encodeURIComponent(serpApiKey)}`);
+      if (params.length) url += `?${params.join('&')}`;
+      const res = await fetch(url, { headers });
+      const contentType = res.headers.get('content-type');
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.unlimited) {
+          setSearchQuota(null);
+        } else {
+          setSearchQuota({ remaining: data.remaining, limit: data.limit });
+        }
+        setQuotaError(null);
+        // Log quota fetch result for debugging
+        console.log('[Quota Fetch]', { url, headers, data });
+      } else {
+        // Fallback: hide quota badge, do not break UI
+        setSearchQuota(null);
+        setQuotaError(null);
+        console.warn('[Quota Fetch] Unexpected response, hiding quota badge.');
+      }
+    } catch (error) {
+      setSearchQuota(null);
+      let errorMsg = 'Failed to fetch quota';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorMsg = (error as Error).message;
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      }
+      setQuotaError(errorMsg);
+      // Log error for debugging
+      console.error('[Quota Fetch Error]', error);
+    }
+  };
+
+  // Run quota fetch on mount (no user id)
+  useEffect(() => {
+    fetchQuota();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, youtubeApiKey, serpApiKey]);
+
+  // Run quota fetch again when user id loads
+  useEffect(() => {
+    if (user?.id) fetchQuota(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   return (
     <div className="flex min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#141414]">
@@ -479,6 +577,50 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                         </div>
                         <span className="text-sm text-[#e1e1e1] group-hover:text-white">Show reasoning</span>
                       </label>
+                      <label className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#2f2f2f] cursor-pointer transition-colors group">
+                        <div className="relative flex items-center">
+                          <input 
+                            type="checkbox" 
+                            checked={webSearch}
+                            onChange={(e) => setWebSearch(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-[#424242] rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </div>
+                        <span className="text-sm text-[#e1e1e1] group-hover:text-white">Web search</span>
+                      </label>
+                      <label className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#2f2f2f] cursor-pointer transition-colors group">
+                        <div className="relative flex items-center">
+                          <input 
+                            type="checkbox" 
+                            checked={youtubeSearch}
+                            onChange={(e) => setYoutubeSearch(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-[#424242] rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        </div>
+                        <span className="text-sm text-[#e1e1e1] group-hover:text-white">YouTube search</span>
+                      </label>
+                      
+                      {/* Search Quota Indicator */}
+                      {!youtubeApiKey && !serpApiKey && (
+                        searchQuota ? (
+                          <div className="px-3 py-2 mt-1 border-t border-[#333]">
+                            <div className="flex items-center justify-between text-xs text-[#8e8ea0] mb-1">
+                              <span>Daily Search Quota</span>
+                              <span className={searchQuota.remaining === 0 ? "text-red-400" : "text-blue-400"}>
+                                {searchQuota.remaining}/{searchQuota.limit}
+                              </span>
+                            </div>
+                            <div className="w-full h-1 bg-[#333] rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${searchQuota.remaining === 0 ? "bg-red-500" : "bg-blue-500"}`}
+                                style={{ width: `${(searchQuota.remaining / searchQuota.limit) * 100}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        ) : null
+                      )}
                     </div>
                   )}
                 </div>
@@ -493,6 +635,28 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                     <Brain className="w-3 h-3 group-hover:hidden" />
                     <X className="w-3 h-3 hidden group-hover:block" />
                     Reasoning
+                  </button>
+                )}
+                {webSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setWebSearch(false)}
+                    className="group px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30 flex items-center gap-1 hover:bg-blue-500/30 hover:text-blue-300 transition-colors"
+                  >
+                    <Link2 className="w-3 h-3 group-hover:hidden" />
+                    <X className="w-3 h-3 hidden group-hover:block" />
+                    Web search
+                  </button>
+                )}
+                {youtubeSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setYoutubeSearch(false)}
+                    className="group px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30 flex items-center gap-1 hover:bg-blue-500/30 hover:text-blue-300 transition-colors"
+                  >
+                    <Youtube className="w-3 h-3 group-hover:hidden" />
+                    <X className="w-3 h-3 hidden group-hover:block" />
+                    YouTube
                   </button>
                 )}
 
@@ -528,6 +692,14 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
           setModel={setModel}
           systemPrompt={systemPrompt}
           setSystemPrompt={setSystemPrompt}
+          youtubeApiKey={youtubeApiKey}
+          setYoutubeApiKey={setYoutubeApiKey}
+          serpApiKey={serpApiKey}
+          setSerpApiKey={setSerpApiKey}
+          showYoutubeKey={showYoutubeKey}
+          setShowYoutubeKey={setShowYoutubeKey}
+          showSerpKey={showSerpKey}
+          setShowSerpKey={setShowSerpKey}
           apiUrl={apiUrl}
         />
       )}
@@ -563,6 +735,45 @@ function WelcomeMessage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SourceCard({ source }: { source: any }) {
+  const getDomain = (url: string) => {
+    if (!url) return 'External Source';
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return 'External Source';
+    }
+  };
+
+  if (!source) return null;
+
+  return (
+    <a 
+      href={source.link || '#'} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 p-3 bg-[#1e1e1e] border border-[#333] rounded-lg hover:bg-[#2a2a2a] hover:border-[#444] transition-all group"
+      onClick={(e) => !source.link && e.preventDefault()}
+    >
+      <div className="w-8 h-8 rounded-full bg-[#2f2f2f] flex items-center justify-center flex-shrink-0 group-hover:bg-[#3f3f3f] transition-colors">
+        {source.type === 'youtube' ? (
+          <Youtube className="w-4 h-4 text-blue-400" />
+        ) : (
+          <Globe className="w-4 h-4 text-blue-400" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-[#ececec] truncate group-hover:text-blue-400 transition-colors" title={source.title || 'Untitled Source'}>
+          {source.title || 'Untitled Source'}
+        </div>
+        <div className="text-xs text-[#8e8ea0] truncate">
+          {source.type === 'youtube' ? (source.channel || 'YouTube') : getDomain(source.link)}
+        </div>
+      </div>
+    </a>
   );
 }
 
@@ -613,6 +824,28 @@ function StreamingMessage({ content, metadata }: { content: string; metadata: an
             </ReactMarkdown>
             <span className="inline-block w-2 h-5 bg-blue-500 animate-pulse ml-0.5 align-middle"></span>
           </div>
+
+          {/* External Sources Section (Streaming) */}
+          {(metadata?.external_sources?.length > 0 || (metadata?.external_sources_section && metadata.external_sources_section.trim())) && (
+            <div className="mt-4 animate-fadeInUp">
+              <div className="font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                External Sources
+              </div>
+              
+              {metadata?.external_sources?.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {metadata.external_sources.map((source: any, idx: number) => (
+                    <SourceCard key={idx} source={source} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#1a1a1a] rounded-lg p-4 border border-blue-500/30">
+                  <pre className="whitespace-pre-wrap text-[#ececec] text-sm font-sans">{metadata.external_sources_section}</pre>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -739,12 +972,40 @@ function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; us
                 {message.images.map((img: any, idx: number) => {
                   const teamInfo = getTeamInfo(img.web_path);
                   return (
-                    <ImageCard key={idx} img={img} teamInfo={teamInfo} apiUrl={apiUrl} />
+                    <div key={idx} className="relative">
+                      <ImageCard img={img} teamInfo={teamInfo} apiUrl={apiUrl} />
+                      {typeof img.relevance === 'number' && (
+                        <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full shadow">
+                          Relevance: {(img.relevance * 100).toFixed(1)}%
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             </div>
           )}
+                  {/* External Sources Section */}
+                  {((message.metadata?.external_sources?.length ?? 0) > 0 || (message.metadata?.external_sources_section && message.metadata.external_sources_section.trim())) && (
+                    <div className="mt-4">
+                      <div className="font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        External Sources
+                      </div>
+                      
+                      {message.metadata?.external_sources && message.metadata.external_sources.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {message.metadata.external_sources.map((source: any, idx: number) => (
+                            <SourceCard key={idx} source={source} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="bg-[#1a1a1a] rounded-lg p-4 border border-blue-500/30">
+                          <pre className="whitespace-pre-wrap text-[#ececec] text-sm font-sans">{message.metadata?.external_sources_section}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
         </div>
       </div>
     </div>
@@ -784,6 +1045,9 @@ function ImagePreviewModal({ imgSrc, img, teamInfo, onClose }: {
             {teamInfo.year && <span>{teamInfo.year} Season</span>}
             {img.page && <span> • Page {img.page}</span>}
           </div>
+          {typeof img.relevance === 'number' && (
+            <div className="mt-2 text-xs text-blue-400 font-semibold">Relevance: {(img.relevance * 100).toFixed(1)}%</div>
+          )}
           {img.context_summary && (
             <p className="mt-2 text-sm text-[#b4b4b4]">{img.context_summary}</p>
           )}
@@ -886,6 +1150,14 @@ function SettingsModal({
   setModel,
   systemPrompt,
   setSystemPrompt,
+  youtubeApiKey,
+  setYoutubeApiKey,
+  serpApiKey,
+  setSerpApiKey,
+  showYoutubeKey,
+  setShowYoutubeKey,
+  showSerpKey,
+  setShowSerpKey,
   apiUrl
 }: {
   onClose: () => void;
@@ -897,6 +1169,14 @@ function SettingsModal({
   setModel: (v: string) => void;
   systemPrompt: string;
   setSystemPrompt: (v: string) => void;
+  youtubeApiKey: string;
+  setYoutubeApiKey: (v: string) => void;
+  serpApiKey: string;
+  setSerpApiKey: (v: string) => void;
+  showYoutubeKey: boolean;
+  setShowYoutubeKey: (v: boolean) => void;
+  showSerpKey: boolean;
+  setShowSerpKey: (v: boolean) => void;
   apiUrl: string;
 }) {
   const [apiKeyValid, setApiKeyValid] = useState(false);
@@ -1014,6 +1294,54 @@ function SettingsModal({
             {apiKeyStatus === 'error' && (
               <p className="text-xs text-red-500">Invalid API key</p>
             )}
+          </div>
+
+          {/* YouTube API Key */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-[#ececec] flex items-center gap-2">
+              <Youtube className="w-4 h-4 text-blue-500" /> YouTube API Key
+            </label>
+            <p className="text-xs text-[#8e8ea0]">Enter your own YouTube Data API key to bypass daily search limits.</p>
+            <div className="relative">
+              <Input
+                type={showYoutubeKey ? "text" : "password"}
+                value={youtubeApiKey}
+                onChange={(e) => setYoutubeApiKey(e.target.value)}
+                placeholder="Enter your YouTube API key..."
+                className="bg-[#0d0d0d] border-[#424242] text-[#ececec] placeholder:text-[#6b6b6b] pr-10 focus:border-blue-500 focus:ring-blue-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowYoutubeKey(!showYoutubeKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8e8ea0] hover:text-white"
+              >
+                {showYoutubeKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* SerpAPI Key */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-[#ececec] flex items-center gap-2">
+              <Globe className="w-4 h-4 text-blue-500" /> SerpAPI Key
+            </label>
+            <p className="text-xs text-[#8e8ea0]">Enter your own SerpAPI key to bypass daily search limits.</p>
+            <div className="relative">
+              <Input
+                type={showSerpKey ? "text" : "password"}
+                value={serpApiKey}
+                onChange={(e) => setSerpApiKey(e.target.value)}
+                placeholder="Enter your SerpAPI key..."
+                className="bg-[#0d0d0d] border-[#424242] text-[#ececec] placeholder:text-[#6b6b6b] pr-10 focus:border-blue-500 focus:ring-blue-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSerpKey(!showSerpKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8e8ea0] hover:text-white"
+              >
+                {showSerpKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Model Selector */}
