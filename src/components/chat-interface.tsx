@@ -4,11 +4,11 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu } from "lucide-react";
+import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu, Plus, Loader2 } from "lucide-react";
 
 type Message = {
   id: string;
@@ -45,6 +45,12 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   // Tools state
   const [toolsOpen, setToolsOpen] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const uploadSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -78,6 +84,79 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       abortControllerRef.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadSuccessTimer.current) {
+        clearTimeout(uploadSuccessTimer.current);
+      }
+    };
+  }, []);
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadStatus('Only PDF files are allowed');
+      event.target.value = '';
+      return;
+    }
+
+    const userId = user?.id || (isGuest ? 'guest' : '');
+    if (!userId) {
+      setUploadStatus('Sign in to upload files');
+      event.target.value = '';
+      return;
+    }
+
+    if (!apiUrl) {
+      setUploadStatus('Backend URL is not configured');
+      event.target.value = '';
+      return;
+    }
+
+    // Prompt for year and team number
+    let newFile = file;
+
+    setIsUploadingFile(true);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', newFile);
+
+      const response = await fetch(`${apiUrl}/api/upload/pdf`, {
+        method: 'POST',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'X-User-Id': userId
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        const message = result?.error || 'Upload failed';
+        throw new Error(message);
+      }
+
+      setUploadStatus(null);
+      setUploadSuccess(true);
+      if (uploadSuccessTimer.current) clearTimeout(uploadSuccessTimer.current);
+      uploadSuccessTimer.current = setTimeout(() => setUploadSuccess(false), 1200);
+    } catch (error: any) {
+      setUploadStatus(error?.message || 'Upload failed');
+      setUploadSuccess(false);
+    } finally {
+      setIsUploadingFile(false);
+      event.target.value = '';
+    }
+  }, [apiUrl, user?.id, isGuest]);
 
   const sendMessage = useCallback(async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
@@ -344,6 +423,33 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
             <div className="flex justify-between items-center mt-2">
               {/* Tools section */}
               <div className="flex items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  disabled={isUploadingFile}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                    uploadSuccess
+                      ? 'text-green-400'
+                      : 'text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f]'
+                  } disabled:text-[#6b6b6b] disabled:bg-[#1c1c1c]`}
+                  title="Upload PDF"
+                >
+                  {isUploadingFile ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : uploadSuccess ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </button>
+
                 <div className="relative">
                   <button
                     id="toolsToggle"
@@ -389,6 +495,12 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                     Reasoning
                   </button>
                 )}
+
+                  {uploadStatus && (
+                    <span className="ml-2 text-xs text-red-400" title={uploadStatus}>
+                      {uploadStatus}
+                    </span>
+                  )}
               </div>
 
               <button
