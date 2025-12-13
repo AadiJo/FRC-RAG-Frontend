@@ -8,7 +8,7 @@ import { useState, useRef, useEffect, useCallback, ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu, Plus, Loader2, Globe, Youtube } from "lucide-react";
+import { ArrowUp, ArrowDown, Square, Settings, Bot, User, X, Eye, EyeOff, Check, SlidersHorizontal, Link2, ImageIcon, Brain, Terminal, Key, Cpu, Plus, Loader2, Globe, Youtube, HelpCircle } from "lucide-react";
 
 type Message = {
   id: string;
@@ -36,7 +36,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Settings state
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
@@ -51,15 +51,17 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   // First-login tutorial
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
-  
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+
   // Tools state
   const [toolsOpen, setToolsOpen] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
   const [youtubeSearch, setYoutubeSearch] = useState(false);
-  const [searchQuota, setSearchQuota] = useState<{remaining: number, limit: number} | null>(null);
+  const [searchQuota, setSearchQuota] = useState<{ remaining: number, limit: number } | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
-  const [openrouterQuota, setOpenrouterQuota] = useState<{remaining: number | null, limit: number | null} | null>(null);
+  const [openrouterQuota, setOpenrouterQuota] = useState<{ remaining: number | null, limit: number | null } | null>(null);
   const [openrouterMessage, setOpenrouterMessage] = useState<string | null>(null);
 
   // Load settings from localStorage
@@ -96,10 +98,10 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   useEffect(() => {
     if (apiKey) localStorage.setItem('frc_rag_api_key', apiKey);
     else localStorage.removeItem('frc_rag_api_key');
-    
+
     if (youtubeApiKey) localStorage.setItem('frc_rag_youtube_key', youtubeApiKey);
     else localStorage.removeItem('frc_rag_youtube_key');
-    
+
     if (serpApiKey) localStorage.setItem('frc_rag_serp_key', serpApiKey);
     else localStorage.removeItem('frc_rag_serp_key');
   }, [apiKey, youtubeApiKey, serpApiKey]);
@@ -109,7 +111,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const uploadSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
   // Try to repair common mojibake (UTF-8 bytes mis-decoded as Latin-1)
@@ -265,7 +267,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     if (model) requestBody.custom_model = model;
     if (youtubeApiKey) requestBody.custom_youtube_key = youtubeApiKey;
     if (serpApiKey) requestBody.custom_serpapi_key = serpApiKey;
-    
+
     let effectiveSystemPrompt = systemPrompt;
     if (user && user.firstName) {
       effectiveSystemPrompt += `\n\nThis user's name is ${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}.`;
@@ -319,8 +321,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                   setSearchQuota(data.data.search_quota);
                 }
               } else if (data.type === 'content') {
-                    currentContent += data.data;
-                    setStreamingContent(fixEncoding(currentContent));
+                currentContent += data.data;
+                setStreamingContent(fixEncoding(currentContent));
               } else if (data.type === 'error') {
                 throw new Error(data.error);
               }
@@ -505,19 +507,29 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     <div className="flex min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#141414]">
       {/* Header */}
       <header className="bg-[#141414] border-b border-[#2f2f2f] px-5 py-6 flex items-center justify-center relative">
-        <button 
-          id="settingsToggle"
-          onClick={() => setSettingsOpen(true)}
-          className="absolute left-5 w-9 h-9 rounded-lg text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f] flex items-center justify-center transition-colors"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
-        
+        <div className="absolute left-5 flex items-center gap-1">
+          <button
+            id="settingsToggle"
+            onClick={() => setSettingsOpen(true)}
+            className="w-9 h-9 rounded-lg text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f] flex items-center justify-center transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          <button
+            id="helpToggle"
+            onClick={() => { setTutorialStep(0); setTutorialOpen(true); }}
+            className="w-9 h-9 rounded-lg text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f] flex items-center justify-center transition-colors"
+            title="Help & Tutorial"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
+        </div>
+
         <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-500 to-red-500 bg-clip-text text-transparent">
           FRC RAG
         </h1>
-        
+
         <div className="absolute right-5 flex items-center gap-3">
           {/* Simple presence badge when a custom OpenRouter key is set */}
           {apiKey ? (
@@ -528,8 +540,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
             </div>
           ) : null}
           {isGuest ? (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={handleLogout}
               className="text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f]"
@@ -543,13 +555,13 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       </header>
 
       {/* Chat Messages */}
-      <main 
+      <main
         ref={chatContainerRef}
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto bg-[#141414]"
       >
         {messages.length === 0 && !isLoading && <WelcomeMessage />}
-        
+
         {/* Render messages */}
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} userImageUrl={user?.imageUrl} apiUrl={apiUrl} />
@@ -557,8 +569,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
 
         {/* Streaming message */}
         {isLoading && (
-          <StreamingMessage 
-            content={streamingContent} 
+          <StreamingMessage
+            content={streamingContent}
             metadata={streamingMetadata}
           />
         )}
@@ -603,11 +615,10 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                   type="button"
                   onClick={openFilePicker}
                   disabled={isUploadingFile}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                    uploadSuccess
-                      ? 'text-green-400'
-                      : 'text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f]'
-                  } disabled:text-[#6b6b6b] disabled:bg-[#1c1c1c]`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${uploadSuccess
+                    ? 'text-green-400'
+                    : 'text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f]'
+                    } disabled:text-[#6b6b6b] disabled:bg-[#1c1c1c]`}
                   title="Upload PDF"
                 >
                   {isUploadingFile ? (
@@ -629,17 +640,17 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                   >
                     <SlidersHorizontal className="w-4 h-4" />
                   </button>
-                  
+
                   {/* Tools Menu */}
                   {toolsOpen && (
-                    <div 
+                    <div
                       id="toolsMenu"
                       className="absolute bottom-full left-0 mb-2 bg-[#1e1e1e] border border-[#424242] rounded-xl p-2 shadow-xl z-50 min-w-[200px]"
                     >
                       <label className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#2f2f2f] cursor-pointer transition-colors group">
                         <div className="relative flex items-center">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={showReasoning}
                             onChange={(e) => setShowReasoning(e.target.checked)}
                             className="sr-only peer"
@@ -650,8 +661,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                       </label>
                       <label className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#2f2f2f] cursor-pointer transition-colors group">
                         <div className="relative flex items-center">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={webSearch}
                             onChange={(e) => setWebSearch(e.target.checked)}
                             className="sr-only peer"
@@ -662,8 +673,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                       </label>
                       <label className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#2f2f2f] cursor-pointer transition-colors group">
                         <div className="relative flex items-center">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={youtubeSearch}
                             onChange={(e) => setYoutubeSearch(e.target.checked)}
                             className="sr-only peer"
@@ -672,7 +683,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                         </div>
                         <span className="text-sm text-[#e1e1e1] group-hover:text-white">YouTube search</span>
                       </label>
-                      
+
                       {/* Search Quota Indicator */}
                       {!youtubeApiKey && !serpApiKey && (
                         searchQuota ? (
@@ -684,7 +695,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                               </span>
                             </div>
                             <div className="w-full h-1 bg-[#333] rounded-full overflow-hidden">
-                              <div 
+                              <div
                                 className={`h-full rounded-full ${searchQuota.remaining === 0 ? "bg-red-500" : "bg-blue-500"}`}
                                 style={{ width: `${(searchQuota.remaining / searchQuota.limit) * 100}%` }}
                               ></div>
@@ -695,7 +706,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Active tools chips */}
                 {showReasoning && (
                   <button
@@ -731,11 +742,11 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                   </button>
                 )}
 
-                  {uploadStatus && (
-                    <span className="ml-2 text-xs text-red-400" title={uploadStatus}>
-                      {uploadStatus}
-                    </span>
-                  )}
+                {uploadStatus && (
+                  <span className="ml-2 text-xs text-red-400" title={uploadStatus}>
+                    {uploadStatus}
+                  </span>
+                )}
               </div>
 
               <button
@@ -753,7 +764,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
 
       {/* Settings Modal */}
       {settingsOpen && (
-        <SettingsModal 
+        <SettingsModal
           onClose={() => setSettingsOpen(false)}
           apiKey={apiKey}
           setApiKey={setApiKey}
@@ -775,79 +786,36 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
         />
       )}
 
-      {/* First-login Tutorial */}
+      {/* First-login Tutorial / Onboarding */}
       {tutorialOpen && !isGuest && (
-        <TutorialModal
-          step={tutorialStep}
-          setStep={setTutorialStep}
+        <OnboardingModal
           onClose={completeTutorial}
           onOpenSettings={() => setSettingsOpen(true)}
+          onStartTour={() => { completeTutorial(); setTourStep(0); setTourActive(true); }}
+        />
+      )}
+
+      {/* Interactive UI Tour */}
+      {tourActive && (
+        <InteractiveTour
+          step={tourStep}
+          setStep={setTourStep}
+          onClose={() => setTourActive(false)}
         />
       )}
     </div>
   );
 }
 
-function TutorialModal({
-  step,
-  setStep,
+function OnboardingModal({
   onClose,
   onOpenSettings,
+  onStartTour,
 }: {
-  step: number;
-  setStep: (v: number) => void;
   onClose: () => void;
   onOpenSettings: () => void;
+  onStartTour: () => void;
 }) {
-  const steps = [
-    {
-      title: 'Welcome to FRC RAG',
-      body: (
-        <div className="space-y-2 text-sm text-[#dcdcdc]">
-          <p>This quick walkthrough will show you the chat UI and Settings.</p>
-          <p>Tip: you can stop a response mid-stream with the square (Stop) button.</p>
-        </div>
-      )
-    },
-    {
-      title: 'Chat & tools',
-      body: (
-        <div className="space-y-2 text-sm text-[#dcdcdc]">
-          <p>Ask questions in the input box and press Enter to send.</p>
-          <p>Use the tool toggles (Reasoning / Web search / YouTube) to control how answers are generated.</p>
-        </div>
-      )
-    },
-    {
-      title: 'Settings',
-      body: (
-        <div className="space-y-2 text-sm text-[#dcdcdc]">
-          <p>Open Settings to add your OpenRouter API key and select a model.</p>
-          <Button
-            type="button"
-            onClick={onOpenSettings}
-            className="bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#ececec]"
-          >
-            Open Settings
-          </Button>
-        </div>
-      )
-    },
-    {
-      title: 'All set',
-      body: (
-        <div className="space-y-2 text-sm text-[#dcdcdc]">
-          <p>You can re-open Settings any time from the gear icon.</p>
-          <p>Have fun — and good luck this season.</p>
-        </div>
-      )
-    },
-  ];
-
-  const current = steps[Math.min(Math.max(step, 0), steps.length - 1)];
-  const isFirst = step <= 0;
-  const isLast = step >= steps.length - 1;
-
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
@@ -857,47 +825,281 @@ function TutorialModal({
         className="bg-[#1e1e1e] border border-[#333] rounded-xl w-full max-w-md shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
-          <h2 className="text-lg font-semibold text-[#ececec]">{current.title}</h2>
+          <h2 className="text-lg font-semibold text-[#ececec] flex items-center gap-2">
+            <Bot className="w-5 h-5 text-blue-500" />
+            Welcome to FRC RAG!
+          </h2>
           <button onClick={onClose} className="text-[#8e8ea0] hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Body */}
         <div className="p-5 space-y-4">
-          {current.body}
-          <div className="text-xs text-[#8e8ea0]">Step {step + 1} of {steps.length}</div>
+          <p className="text-sm text-[#dcdcdc]">
+            FRC RAG helps you find answers from FRC team technical binders. Before you start, here are some tips:
+          </p>
+
+          {/* Settings explanation */}
+          <div className="bg-[#252525] border border-[#333] rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[#ececec] font-medium">
+              <Settings className="w-4 h-4 text-blue-500" />
+              Settings Menu
+            </div>
+            <p className="text-xs text-[#b4b4b4]">
+              Click the <strong className="text-[#ececec]">gear icon</strong> in the top-left to access settings. You can customize your experience and add API keys.
+            </p>
+          </div>
+
+          {/* API Keys explanation */}
+          <div className="bg-[#1a2e1a] border border-[#2d4a2d] rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[#9bbf7d] font-medium">
+              <Key className="w-4 h-4" />
+              All API Keys are FREE & Optional
+            </div>
+            <p className="text-xs text-[#8cb88c]">
+              The app works without any API keys! If you want to use your own keys for unlimited access:
+            </p>
+            <ul className="text-xs text-[#8cb88c] space-y-1 pl-4 list-disc">
+              <li><strong>OpenRouter</strong> — Free tier available, unlock model selection</li>
+              <li><strong>YouTube API</strong> — Free quota from Google Cloud Console</li>
+              <li><strong>SerpAPI</strong> — Free tier for web search</li>
+            </ul>
+          </div>
+
+          {/* Help button reminder */}
+          <p className="text-xs text-[#8e8ea0] flex items-center gap-1">
+            <HelpCircle className="w-3 h-3" />
+            Click the help icon anytime to see this again or take a tour.
+          </p>
         </div>
 
+        {/* Footer */}
         <div className="px-5 py-4 border-t border-[#333] flex items-center justify-between">
           <Button
             type="button"
             variant="ghost"
-            className="text-[#ececec] hover:bg-white/10"
-            onClick={() => setStep(Math.max(0, step - 1))}
-            disabled={isFirst}
+            className="text-[#ececec] hover:bg-white/10 flex items-center gap-1.5 px-2"
+            onClick={() => { onOpenSettings(); onClose(); }}
           >
-            Back
+            <Settings className="w-4 h-4" />
+            Open Settings
           </Button>
-          {isLast ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-blue-400 hover:bg-blue-500/10"
+              onClick={onStartTour}
+            >
+              Take a Tour
+            </Button>
             <Button
               type="button"
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6"
               onClick={onClose}
             >
-              Finish
+              Get Started
             </Button>
-          ) : (
-            <Button
-              type="button"
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6"
-              onClick={() => setStep(Math.min(steps.length - 1, step + 1))}
-            >
-              Next
-            </Button>
-          )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Tour step definitions
+const TOUR_STEPS = [
+  {
+    target: '#settingsToggle',
+    title: 'Settings',
+    description: 'Access your API keys, model selection, and custom instructions here. All API keys are free!',
+    position: 'bottom-start' as const,
+  },
+  {
+    target: '#helpToggle',
+    title: 'Help & Tutorial',
+    description: 'Click here anytime to view the welcome guide or restart this tour.',
+    position: 'bottom-start' as const,
+  },
+  {
+    target: '#chatInput',
+    title: 'Ask Questions',
+    description: 'Type your FRC questions here. Press Enter to send, or Shift+Enter for a new line.',
+    position: 'top' as const,
+  },
+  {
+    target: '#toolsToggle',
+    title: 'Tools Menu',
+    description: 'Enable reasoning mode, web search, and YouTube search to enhance your answers.',
+    position: 'top' as const,
+  },
+  {
+    target: 'button[title="Upload PDF"]',
+    title: 'Upload PDFs',
+    description: 'Add your own team technical binders to expand the knowledge base.',
+    position: 'top' as const,
+  },
+];
+
+function InteractiveTour({
+  step,
+  setStep,
+  onClose,
+}: {
+  step: number;
+  setStep: (v: number) => void;
+  onClose: () => void;
+}) {
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const currentStep = TOUR_STEPS[step];
+
+  useEffect(() => {
+    if (!currentStep) return;
+
+    const element = document.querySelector(currentStep.target);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      setTargetRect(rect);
+      // Scroll element into view if needed
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [step, currentStep]);
+
+  if (!currentStep || !targetRect) {
+    return null;
+  }
+
+  const isLast = step >= TOUR_STEPS.length - 1;
+  const isFirst = step <= 0;
+
+  // Calculate tooltip position based on the target element and position preference
+  const getTooltipStyle = (): React.CSSProperties => {
+    const padding = 12;
+    const tooltipWidth = 280;
+
+    switch (currentStep.position) {
+      case 'bottom-start':
+        return {
+          top: targetRect.bottom + padding,
+          left: targetRect.left,
+        };
+      case 'top':
+        return {
+          bottom: window.innerHeight - targetRect.top + padding,
+          left: targetRect.left + targetRect.width / 2,
+          transform: 'translateX(-50%)',
+        };
+      default:
+        return {
+          top: targetRect.bottom + padding,
+          left: targetRect.left + targetRect.width / 2,
+          transform: 'translateX(-50%)',
+        };
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100]">
+      {/* Overlay with spotlight cutout */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        <defs>
+          <mask id="spotlight-mask">
+            <rect width="100%" height="100%" fill="white" />
+            <rect
+              x={targetRect.left - 4}
+              y={targetRect.top - 4}
+              width={targetRect.width + 8}
+              height={targetRect.height + 8}
+              rx="8"
+              fill="black"
+            />
+          </mask>
+        </defs>
+        <rect
+          width="100%"
+          height="100%"
+          fill="rgba(0, 0, 0, 0.75)"
+          mask="url(#spotlight-mask)"
+        />
+      </svg>
+
+      {/* Highlight ring around target */}
+      <div
+        className="absolute border-2 border-blue-500 rounded-lg pointer-events-none animate-pulse"
+        style={{
+          top: targetRect.top - 4,
+          left: targetRect.left - 4,
+          width: targetRect.width + 8,
+          height: targetRect.height + 8,
+          boxShadow: '0 0 0 4px rgba(59, 130, 246, 0.3)',
+        }}
+      />
+
+      {/* Tooltip */}
+      <div
+        className="absolute bg-[#1e1e1e] border border-[#424242] rounded-xl shadow-2xl p-4 w-[280px] animate-in fade-in zoom-in-95 duration-200"
+        style={getTooltipStyle()}
+      >
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="text-sm font-semibold text-[#ececec]">{currentStep.title}</h3>
+          <button
+            onClick={onClose}
+            className="text-[#8e8ea0] hover:text-white transition-colors -mt-1 -mr-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-[#b4b4b4] mb-4">{currentStep.description}</p>
+
+        {/* Step indicator */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {TOUR_STEPS.map((_, i) => (
+              <div
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? 'bg-blue-500' : 'bg-[#424242]'
+                  }`}
+              />
+            ))}
+            <span className="text-xs text-[#8e8ea0] ml-2">{step + 1}/{TOUR_STEPS.length}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isFirst && (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="text-xs text-[#8e8ea0] hover:text-white transition-colors"
+              >
+                Back
+              </button>
+            )}
+            <Button
+              size="sm"
+              className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 h-7"
+              onClick={() => {
+                if (isLast) {
+                  onClose();
+                } else {
+                  setStep(step + 1);
+                }
+              }}
+            >
+              {isLast ? 'Finish' : 'Next'}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Skip button */}
+      <button
+        onClick={onClose}
+        className="absolute bottom-4 right-4 text-sm text-[#8e8ea0] hover:text-white transition-colors"
+      >
+        Skip Tour
+      </button>
     </div>
   );
 }
@@ -946,9 +1148,9 @@ function SourceCard({ source }: { source: any }) {
   if (!source) return null;
 
   return (
-    <a 
-      href={source.link || '#'} 
-      target="_blank" 
+    <a
+      href={source.link || '#'}
+      target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-3 p-3 bg-[#1e1e1e] border border-[#333] rounded-lg hover:bg-[#2a2a2a] hover:border-[#444] transition-all group"
       onClick={(e) => !source.link && e.preventDefault()}
@@ -999,7 +1201,7 @@ function StreamingMessage({ content, metadata }: { content: string; metadata: an
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center flex-shrink-0">
           <Bot className="w-4 h-4 text-white" />
         </div>
-        
+
         <div className="flex-1 min-w-0 pt-[0.15rem]">
           {/* Game piece context chips */}
           {metadata?.matched_pieces && metadata.matched_pieces.length > 0 && (
@@ -1012,7 +1214,7 @@ function StreamingMessage({ content, metadata }: { content: string; metadata: an
               ))}
             </div>
           )}
-          
+
           <div className="prose prose-invert max-w-none text-[#ececec] leading-relaxed [&>*:first-child]:mt-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
               {content}
@@ -1027,7 +1229,7 @@ function StreamingMessage({ content, metadata }: { content: string; metadata: an
                 <Globe className="w-4 h-4" />
                 External Sources
               </div>
-              
+
               {metadata?.external_sources?.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {metadata.external_sources.map((source: any, idx: number) => (
@@ -1117,27 +1319,26 @@ function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; us
   };
 
   return (
-    <div 
+    <div
       data-message-role={message.role}
       className={`px-5 py-4 border-b border-[rgba(255,255,255,0.05)] animate-fadeInUp ${isUser ? "bg-[#1a1a1a]" : "bg-[#141414]"}`}
     >
       <div className="max-w-3xl mx-auto flex gap-4 items-start">
         {isUser && userImageUrl ? (
-          <img 
-            src={userImageUrl} 
-            alt="User" 
+          <img
+            src={userImageUrl}
+            alt="User"
             className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
           />
         ) : (
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isUser 
-              ? "bg-gradient-to-br from-blue-500 to-blue-600" 
-              : "bg-gradient-to-br from-blue-500 to-red-500"
-          }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isUser
+            ? "bg-gradient-to-br from-blue-500 to-blue-600"
+            : "bg-gradient-to-br from-blue-500 to-red-500"
+            }`}>
             {isUser ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
           </div>
         )}
-        
+
         <div className="flex-1 min-w-0 pt-[0.15rem]">
           {/* Game piece context chips */}
           {!isUser && message.metadata?.matched_pieces && message.metadata.matched_pieces.length > 0 && (
@@ -1150,13 +1351,13 @@ function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; us
               ))}
             </div>
           )}
-          
+
           <div className="prose prose-invert max-w-none text-[#ececec] leading-relaxed [&>*:first-child]:mt-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
               {message.content}
             </ReactMarkdown>
           </div>
-          
+
           {message.images && message.images.length > 0 && (
             <div className="mt-4 bg-[#1a1a1a] rounded-lg p-4 border border-[#333]">
               <div className="flex items-center gap-2 mb-3 font-semibold text-[#ececec]">
@@ -1180,27 +1381,27 @@ function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; us
               </div>
             </div>
           )}
-                  {/* External Sources Section */}
-                  {((message.metadata?.external_sources?.length ?? 0) > 0 || (message.metadata?.external_sources_section && message.metadata.external_sources_section.trim())) && (
-                    <div className="mt-4">
-                      <div className="font-semibold text-blue-400 mb-3 flex items-center gap-2">
-                        <Globe className="w-4 h-4" />
-                        External Sources
-                      </div>
-                      
-                      {message.metadata?.external_sources && message.metadata.external_sources.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {message.metadata.external_sources.map((source: any, idx: number) => (
-                            <SourceCard key={idx} source={source} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="bg-[#1a1a1a] rounded-lg p-4 border border-blue-500/30">
-                          <pre className="whitespace-pre-wrap text-[#ececec] text-sm font-sans">{message.metadata?.external_sources_section}</pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
+          {/* External Sources Section */}
+          {((message.metadata?.external_sources?.length ?? 0) > 0 || (message.metadata?.external_sources_section && message.metadata.external_sources_section.trim())) && (
+            <div className="mt-4">
+              <div className="font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                External Sources
+              </div>
+
+              {message.metadata?.external_sources && message.metadata.external_sources.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {message.metadata.external_sources.map((source: any, idx: number) => (
+                    <SourceCard key={idx} source={source} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#1a1a1a] rounded-lg p-4 border border-blue-500/30">
+                  <pre className="whitespace-pre-wrap text-[#ececec] text-sm font-sans">{message.metadata?.external_sources_section}</pre>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1208,29 +1409,29 @@ function MessageBubble({ message, userImageUrl, apiUrl }: { message: Message; us
 }
 
 // Image preview modal
-function ImagePreviewModal({ imgSrc, img, teamInfo, onClose }: { 
-  imgSrc: string; 
-  img: any; 
-  teamInfo: { team: string; year: string }; 
-  onClose: () => void 
+function ImagePreviewModal({ imgSrc, img, teamInfo, onClose }: {
+  imgSrc: string;
+  img: any;
+  teamInfo: { team: string; year: string };
+  onClose: () => void
 }) {
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="relative max-w-4xl max-h-[90vh] bg-[#1e1e1e] rounded-xl overflow-hidden border border-[#333]"
         onClick={(e) => e.stopPropagation()}
       >
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
-        <img 
-          src={imgSrc} 
+        <img
+          src={imgSrc}
           alt={`Team ${teamInfo.team}`}
           className="max-w-full max-h-[70vh] object-contain mx-auto block"
         />
@@ -1260,7 +1461,7 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
 
   useEffect(() => {
     let objectUrl: string | null = null;
-    
+
     const loadImage = async () => {
       try {
         const response = await fetch(`${apiUrl}/images/${img.web_path}`, {
@@ -1277,7 +1478,7 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
       }
     };
     loadImage();
-    
+
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
@@ -1299,13 +1500,13 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
 
   return (
     <>
-      <div 
+      <div
         className="relative bg-[#1a1a1a] rounded-lg overflow-hidden border border-[#333] hover:translate-y-[-2px] hover:shadow-lg transition-all cursor-pointer group"
         onClick={() => imgSrc && setShowPreview(true)}
       >
         {imgSrc ? (
-          <img 
-            src={imgSrc} 
+          <img
+            src={imgSrc}
             alt={`Team ${teamInfo.team}`}
             className="w-full h-32 object-cover"
           />
@@ -1324,22 +1525,22 @@ function ImageCard({ img, teamInfo, apiUrl }: { img: any; teamInfo: { team: stri
         </div>
       </div>
       {showPreview && imgSrc && (
-        <ImagePreviewModal 
-          imgSrc={imgSrc} 
-          img={img} 
-          teamInfo={teamInfo} 
-          onClose={() => setShowPreview(false)} 
+        <ImagePreviewModal
+          imgSrc={imgSrc}
+          img={img}
+          teamInfo={teamInfo}
+          onClose={() => setShowPreview(false)}
         />
       )}
     </>
   );
 }
 
-function SettingsModal({ 
-  onClose, 
-  apiKey, 
-  setApiKey, 
-  showApiKey, 
+function SettingsModal({
+  onClose,
+  apiKey,
+  setApiKey,
+  showApiKey,
   setShowApiKey,
   model,
   setModel,
@@ -1377,7 +1578,7 @@ function SettingsModal({
   const [apiKeyValid, setApiKeyValid] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [validatedApiKey, setValidatedApiKey] = useState<string>('');
-  const [models, setModels] = useState<{id: string; name: string; free: boolean}[]>([]);
+  const [models, setModels] = useState<{ id: string; name: string; free: boolean }[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [apiKeyQuota, setApiKeyQuota] = useState<any>(null);
   const [serverDefaultModel, setServerDefaultModel] = useState<string>('');
@@ -1417,7 +1618,7 @@ function SettingsModal({
         });
         const modelsData = await modelsRes.json();
         if (modelsData.models) {
-          const sorted = [...modelsData.models].sort((a: {free: boolean}, b: {free: boolean}) => {
+          const sorted = [...modelsData.models].sort((a: { free: boolean }, b: { free: boolean }) => {
             if (a.free && !b.free) return -1;
             if (!a.free && b.free) return 1;
             return 0;
@@ -1539,7 +1740,7 @@ function SettingsModal({
                   {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <button 
+              <button
                 onClick={validateKey}
                 disabled={!apiKey.trim() || apiKeyStatus === 'loading'}
                 className="w-11 h-9 bg-[#1e3a8a] border border-[#3b82f6] rounded-lg text-[#60a5fa] hover:bg-[#1e40af] hover:text-[#93c5fd] disabled:bg-[#2f2f2f] disabled:border-[#424242] disabled:text-[#6b6b6b] disabled:cursor-not-allowed flex items-center justify-center transition-colors"
@@ -1552,17 +1753,17 @@ function SettingsModal({
               </button>
             </div>
             {apiKeyStatus === 'success' && (
-                <p className="text-xs text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> API key validated</p>
+              <p className="text-xs text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> API key validated</p>
             )}
-              {apiKeyStatus === 'success' && apiKeyQuota && (
-                <p className="text-xs text-[#8e8ea0] mt-1">
-                  {apiKeyQuota.unlimited ? (
-                    <>Provider-managed quota (check OpenRouter dashboard)</>
-                  ) : (
-                    <>Quota: {apiKeyQuota.remaining}/{apiKeyQuota.limit}</>
-                  )}
-                </p>
-              )}
+            {apiKeyStatus === 'success' && apiKeyQuota && (
+              <p className="text-xs text-[#8e8ea0] mt-1">
+                {apiKeyQuota.unlimited ? (
+                  <>Provider-managed quota (check OpenRouter dashboard)</>
+                ) : (
+                  <>Quota: {apiKeyQuota.remaining}/{apiKeyQuota.limit}</>
+                )}
+              </p>
+            )}
             {apiKeyStatus === 'error' && (
               <p className="text-xs text-red-500">Invalid API key</p>
             )}
@@ -1622,20 +1823,19 @@ function SettingsModal({
               <Cpu className="w-4 h-4 text-blue-500" /> Model
             </label>
             <p className="text-xs text-[#8e8ea0]">Select a model to use. Requires a valid API key to change from default.</p>
-            
+
             <div className="relative">
               <button
                 type="button"
                 onClick={() => apiKeyValid && setDropdownOpen(!dropdownOpen)}
                 disabled={!apiKeyValid}
-                className={`w-full bg-[#0d0d0d] border border-[#424242] rounded-lg px-3 py-2.5 text-left flex items-center justify-between transition-colors ${
-                  apiKeyValid ? 'text-[#ececec] hover:border-[#555] cursor-pointer' : 'text-[#6b6b6b] cursor-not-allowed'
-                } ${dropdownOpen ? 'border-blue-500' : ''}`}
+                className={`w-full bg-[#0d0d0d] border border-[#424242] rounded-lg px-3 py-2.5 text-left flex items-center justify-between transition-colors ${apiKeyValid ? 'text-[#ececec] hover:border-[#555] cursor-pointer' : 'text-[#6b6b6b] cursor-not-allowed'
+                  } ${dropdownOpen ? 'border-blue-500' : ''}`}
               >
                 <span className="truncate">{selectedModelName}</span>
                 <ArrowDown className={`w-4 h-4 flex-shrink-0 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {dropdownOpen && apiKeyValid && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#424242] rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
                   {models.map((m) => (
@@ -1643,9 +1843,8 @@ function SettingsModal({
                       key={m.id}
                       type="button"
                       onClick={() => { setModel(m.id); setDropdownOpen(false); }}
-                      className={`w-full px-3 py-2.5 text-left hover:bg-[#2a2a2a] flex items-center justify-between transition-colors ${
-                        model === m.id ? 'bg-[#2a2a2a] text-blue-400' : 'text-[#ececec]'
-                      }`}
+                      className={`w-full px-3 py-2.5 text-left hover:bg-[#2a2a2a] flex items-center justify-between transition-colors ${model === m.id ? 'bg-[#2a2a2a] text-blue-400' : 'text-[#ececec]'
+                        }`}
                     >
                       <span className="truncate">{m.name}</span>
                       {!m.free && <span className="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">PAID</span>}
@@ -1654,7 +1853,7 @@ function SettingsModal({
                 </div>
               )}
             </div>
-            
+
             <p className="text-xs text-[#8e8ea0] flex items-center gap-1">
               {apiKeyValid ? (
                 <><Check className="w-3 h-3 text-green-500" /> Model selection enabled (uses your key)</>
@@ -1667,7 +1866,7 @@ function SettingsModal({
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-[#333] flex justify-end">
-          <Button 
+          <Button
             onClick={onClose}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6"
           >
