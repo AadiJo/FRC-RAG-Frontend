@@ -321,7 +321,7 @@ export function LandingPage({ onGuestLogin }: { onGuestLogin?: () => void }) {
               </details>
               <details className="rounded-xl border border-white/10 bg-white/5 p-4 group">
                 <summary className="cursor-pointer text-sm sm:text-lg font-semibold text-blue-400 group-open:text-blue-300">Can I provide my own model?</summary>
-                <div className="mt-2 text-white/80 text-xs sm:text-base">Currently, you provide your own model directly through the chutes API, with more providers coming soon.</div>
+                <div className="mt-2 text-white/80 text-xs sm:text-base">Currently, you provide your own model through OpenRouter, with more providers coming soon.</div>
               </details>
               <details className="rounded-xl border border-white/10 bg-white/5 p-4 group">
                 <summary className="cursor-pointer text-sm sm:text-lg font-semibold text-blue-400 group-open:text-blue-300">What data is stored?</summary>

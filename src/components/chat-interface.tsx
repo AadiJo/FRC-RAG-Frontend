@@ -47,6 +47,10 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const [serpApiKey, setSerpApiKey] = useState("");
   const [showYoutubeKey, setShowYoutubeKey] = useState(false);
   const [showSerpKey, setShowSerpKey] = useState(false);
+
+  // First-login tutorial
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   
   // Tools state
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -55,6 +59,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const [youtubeSearch, setYoutubeSearch] = useState(false);
   const [searchQuota, setSearchQuota] = useState<{remaining: number, limit: number} | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [openrouterQuota, setOpenrouterQuota] = useState<{remaining: number | null, limit: number | null} | null>(null);
+  const [openrouterMessage, setOpenrouterMessage] = useState<string | null>(null);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -65,6 +71,26 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
     if (savedYoutubeKey) setYoutubeApiKey(savedYoutubeKey);
     if (savedSerpKey) setSerpApiKey(savedSerpKey);
   }, []);
+
+  // Show tutorial once per signed-in user
+  useEffect(() => {
+    if (isGuest) return;
+    if (!user?.id) return;
+
+    const seenKey = `frc_rag_tutorial_seen_${user.id}`;
+    const seen = localStorage.getItem(seenKey) === '1';
+    if (!seen) {
+      setTutorialStep(0);
+      setTutorialOpen(true);
+    }
+  }, [isGuest, user?.id]);
+
+  const completeTutorial = useCallback(() => {
+    if (!isGuest && user?.id) {
+      localStorage.setItem(`frc_rag_tutorial_seen_${user.id}`, '1');
+    }
+    setTutorialOpen(false);
+  }, [isGuest, user?.id]);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -85,6 +111,21 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   const uploadSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+  // Try to repair common mojibake (UTF-8 bytes mis-decoded as Latin-1)
+  const fixEncoding = (s: string) => {
+    try {
+      // quick heuristic: if we see common mojibake characters, attempt recovery
+      if (/[ÂÃâÄ]/.test(s)) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - escape is available in browsers
+        return decodeURIComponent(escape(s));
+      }
+      return s;
+    } catch (e) {
+      return s;
+    }
+  };
 
   const handleLogout = () => {
     if (isGuest) {
@@ -278,8 +319,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
                   setSearchQuota(data.data.search_quota);
                 }
               } else if (data.type === 'content') {
-                currentContent += data.data;
-                setStreamingContent(currentContent);
+                    currentContent += data.data;
+                    setStreamingContent(fixEncoding(currentContent));
               } else if (data.type === 'error') {
                 throw new Error(data.error);
               }
@@ -298,7 +339,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: currentContent,
+        content: fixEncoding(currentContent),
         images: metadata?.images,
         metadata: metadata
       };
@@ -314,7 +355,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
           const assistantMessage: Message = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
-            content: currentContent,
+            content: fixEncoding(currentContent),
             images: metadata?.images,
             metadata: metadata
           };
@@ -392,6 +433,8 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       const params: string[] = [];
       if (youtubeApiKey) params.push(`custom_youtube_key=${encodeURIComponent(youtubeApiKey)}`);
       if (serpApiKey) params.push(`custom_serpapi_key=${encodeURIComponent(serpApiKey)}`);
+      // If the user has entered their own OpenRouter API key in settings, pass it
+      if (apiKey) params.push(`custom_api_key=${encodeURIComponent(apiKey)}`);
       if (params.length) url += `?${params.join('&')}`;
       const res = await fetch(url, { headers });
       const contentType = res.headers.get('content-type');
@@ -400,12 +443,29 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       }
       if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
-        if (data.unlimited) {
+        // If we passed a custom_api_key (apiKey), treat this response as OpenRouter quota info
+        if (apiKey) {
+          if (data.error) {
+            setOpenrouterQuota(null);
+            setOpenrouterMessage(data.error || 'Invalid key');
+          } else if (data.unlimited) {
+            setOpenrouterQuota(null);
+            setOpenrouterMessage(data.message || 'Key valid — quota not exposed via provider API');
+          } else {
+            setOpenrouterQuota({ remaining: data.remaining ?? null, limit: data.limit ?? null });
+            setOpenrouterMessage(null);
+          }
+          // Keep web/search quota hidden when user provides their own OpenRouter key
           setSearchQuota(null);
         } else {
-          setSearchQuota({ remaining: data.remaining, limit: data.limit });
+          // No custom OpenRouter key — treat response as search quota
+          if (data.unlimited) {
+            setSearchQuota(null);
+          } else {
+            setSearchQuota({ remaining: data.remaining, limit: data.limit });
+          }
+          setQuotaError(null);
         }
-        setQuotaError(null);
         // Log quota fetch result for debugging
         console.log('[Quota Fetch]', { url, headers, data });
       } else {
@@ -416,6 +476,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       }
     } catch (error) {
       setSearchQuota(null);
+      setOpenrouterQuota(null);
       let errorMsg = 'Failed to fetch quota';
       if (error && typeof error === 'object' && 'message' in error) {
         errorMsg = (error as Error).message;
@@ -432,7 +493,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
   useEffect(() => {
     fetchQuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiUrl, youtubeApiKey, serpApiKey]);
+  }, [apiUrl, youtubeApiKey, serpApiKey, apiKey]);
 
   // Run quota fetch again when user id loads
   useEffect(() => {
@@ -445,6 +506,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
       {/* Header */}
       <header className="bg-[#141414] border-b border-[#2f2f2f] px-5 py-6 flex items-center justify-center relative">
         <button 
+          id="settingsToggle"
           onClick={() => setSettingsOpen(true)}
           className="absolute left-5 w-9 h-9 rounded-lg text-[#8e8ea0] hover:text-white hover:bg-[#3f3f3f] flex items-center justify-center transition-colors"
           title="Settings"
@@ -456,7 +518,15 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
           FRC RAG
         </h1>
         
-        <div className="absolute right-5">
+        <div className="absolute right-5 flex items-center gap-3">
+          {/* Simple presence badge when a custom OpenRouter key is set */}
+          {apiKey ? (
+            <div className="mr-2">
+              <div title="Using your OpenRouter API key" className="text-xs text-[#9bbf7d] bg-[#0f2a10] border border-[#123517] px-2 py-1 rounded-full">
+                API Key
+              </div>
+            </div>
+          ) : null}
           {isGuest ? (
             <Button 
               variant="ghost" 
@@ -509,6 +579,7 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
           <div className="bg-[#212121] border-2 border-[#424242] rounded-[26px] p-3 focus-within:border-blue-500 focus-within:shadow-lg focus-within:shadow-blue-500/20 transition-colors">
             <textarea
+              id="chatInput"
               ref={textareaRef}
               value={input}
               onChange={handleTextareaChange}
@@ -703,6 +774,130 @@ export function ChatInterface({ isGuest }: { isGuest: boolean }) {
           apiUrl={apiUrl}
         />
       )}
+
+      {/* First-login Tutorial */}
+      {tutorialOpen && !isGuest && (
+        <TutorialModal
+          step={tutorialStep}
+          setStep={setTutorialStep}
+          onClose={completeTutorial}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TutorialModal({
+  step,
+  setStep,
+  onClose,
+  onOpenSettings,
+}: {
+  step: number;
+  setStep: (v: number) => void;
+  onClose: () => void;
+  onOpenSettings: () => void;
+}) {
+  const steps = [
+    {
+      title: 'Welcome to FRC RAG',
+      body: (
+        <div className="space-y-2 text-sm text-[#dcdcdc]">
+          <p>This quick walkthrough will show you the chat UI and Settings.</p>
+          <p>Tip: you can stop a response mid-stream with the square (Stop) button.</p>
+        </div>
+      )
+    },
+    {
+      title: 'Chat & tools',
+      body: (
+        <div className="space-y-2 text-sm text-[#dcdcdc]">
+          <p>Ask questions in the input box and press Enter to send.</p>
+          <p>Use the tool toggles (Reasoning / Web search / YouTube) to control how answers are generated.</p>
+        </div>
+      )
+    },
+    {
+      title: 'Settings',
+      body: (
+        <div className="space-y-2 text-sm text-[#dcdcdc]">
+          <p>Open Settings to add your OpenRouter API key and select a model.</p>
+          <Button
+            type="button"
+            onClick={onOpenSettings}
+            className="bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#ececec]"
+          >
+            Open Settings
+          </Button>
+        </div>
+      )
+    },
+    {
+      title: 'All set',
+      body: (
+        <div className="space-y-2 text-sm text-[#dcdcdc]">
+          <p>You can re-open Settings any time from the gear icon.</p>
+          <p>Have fun — and good luck this season.</p>
+        </div>
+      )
+    },
+  ];
+
+  const current = steps[Math.min(Math.max(step, 0), steps.length - 1)];
+  const isFirst = step <= 0;
+  const isLast = step >= steps.length - 1;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1e1e1e] border border-[#333] rounded-xl w-full max-w-md shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
+          <h2 className="text-lg font-semibold text-[#ececec]">{current.title}</h2>
+          <button onClick={onClose} className="text-[#8e8ea0] hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {current.body}
+          <div className="text-xs text-[#8e8ea0]">Step {step + 1} of {steps.length}</div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-[#333] flex items-center justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-[#ececec] hover:bg-white/10"
+            onClick={() => setStep(Math.max(0, step - 1))}
+            disabled={isFirst}
+          >
+            Back
+          </Button>
+          {isLast ? (
+            <Button
+              type="button"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6"
+              onClick={onClose}
+            >
+              Finish
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6"
+              onClick={() => setStep(Math.min(steps.length - 1, step + 1))}
+            >
+              Next
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1181,16 +1376,32 @@ function SettingsModal({
 }) {
   const [apiKeyValid, setApiKeyValid] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [validatedApiKey, setValidatedApiKey] = useState<string>('');
   const [models, setModels] = useState<{id: string; name: string; free: boolean}[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [apiKeyQuota, setApiKeyQuota] = useState<any>(null);
+  const [serverDefaultModel, setServerDefaultModel] = useState<string>('');
 
-  const DEFAULT_MODEL_NAME = 'GPT-OSS 20B (Server Default)';
+  // Prefer a free model for the client-side "server default" when available
+  const effectiveDefaultModelId = (() => {
+    // Prefer the first free model in the curated/public list
+    const freeModel = models.find(m => m.free);
+    if (freeModel) return freeModel.id;
+    // Otherwise, fall back to the server-provided default model id
+    return serverDefaultModel || '';
+  })();
+
+  const DEFAULT_MODEL_NAME = (() => {
+    const m = models.find(x => x.id === effectiveDefaultModelId);
+    if (m) return `${m.name} (Server Default)`;
+    return serverDefaultModel ? `${serverDefaultModel} (Server Default)` : 'Server Default Model';
+  })();
 
   const validateKey = async () => {
     if (!apiKey.trim()) return;
     setApiKeyStatus('loading');
     try {
-      const res = await fetch(`${apiUrl}/api/chutes/validate`, {
+      const res = await fetch(`${apiUrl}/api/openrouter/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ api_key: apiKey })
@@ -1199,9 +1410,10 @@ function SettingsModal({
       if (data.valid) {
         setApiKeyValid(true);
         setApiKeyStatus('success');
+        setValidatedApiKey(apiKey);
         // Load models
-        const modelsRes = await fetch(`${apiUrl}/api/chutes/models`, {
-          headers: { 'ngrok-skip-browser-warning': 'true' }
+        const modelsRes = await fetch(`${apiUrl}/api/openrouter/models`, {
+          headers: { 'ngrok-skip-browser-warning': 'true', 'X-OpenRouter-Key': apiKey }
         });
         const modelsData = await modelsRes.json();
         if (modelsData.models) {
@@ -1212,15 +1424,66 @@ function SettingsModal({
           });
           setModels(sorted);
         }
+        // Fetch quota info for this custom OpenRouter key
+        try {
+          const quotaRes = await fetch(`${apiUrl}/api/quota?custom_api_key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (quotaRes.ok) {
+            const q = await quotaRes.json();
+            setApiKeyQuota(q);
+          }
+        } catch (e) {
+          // ignore
+        }
       } else {
         setApiKeyValid(false);
         setApiKeyStatus('error');
+        setValidatedApiKey('');
       }
     } catch {
       setApiKeyValid(false);
       setApiKeyStatus('error');
+      setValidatedApiKey('');
     }
   };
+
+  // Auto-validate stored API key on mount (once) to sync badge + dropdown
+  useEffect(() => {
+    if (apiKey && !validatedApiKey && apiKeyStatus !== 'loading') {
+      validateKey();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When settings modal unmounts (on close), if API key changed since last validation, validate it.
+  useEffect(() => {
+    return () => {
+      if (apiKey && apiKey !== validatedApiKey && apiKeyStatus !== 'loading') {
+        validateKey();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, validatedApiKey, apiKeyStatus]);
+
+  // Load public/curated models on mount so settings shows server default even without validating key
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/openrouter/models`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.models) setModels(data.models);
+        if (data.default_model) setServerDefaultModel(data.default_model || '');
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl]);
 
   const selectedModelName = models.find(m => m.id === model)?.name || (model ? model : DEFAULT_MODEL_NAME);
 
@@ -1256,16 +1519,16 @@ function SettingsModal({
           {/* API Key */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-[#ececec] flex items-center gap-2">
-              <Key className="w-4 h-4 text-blue-500" /> Chutes API Key
+              <Key className="w-4 h-4 text-blue-500" /> OpenRouter API Key
             </label>
-            <p className="text-xs text-[#8e8ea0]">Enter your own Chutes API key to unlock model selection and use your own quota.</p>
+            <p className="text-xs text-[#8e8ea0]">Enter your OpenRouter API key to unlock model selection and use your own quota.</p>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
                   type={showApiKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('idle'); setApiKeyValid(false); }}
-                  placeholder="Enter your Chutes API key..."
+                  placeholder="Enter your OpenRouter API key..."
                   className="bg-[#0d0d0d] border-[#424242] text-[#ececec] placeholder:text-[#6b6b6b] pr-10 focus:border-blue-500 focus:ring-blue-500/20"
                 />
                 <button
@@ -1289,8 +1552,17 @@ function SettingsModal({
               </button>
             </div>
             {apiKeyStatus === 'success' && (
-              <p className="text-xs text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> API key validated</p>
+                <p className="text-xs text-green-500 flex items-center gap-1"><Check className="w-3 h-3" /> API key validated</p>
             )}
+              {apiKeyStatus === 'success' && apiKeyQuota && (
+                <p className="text-xs text-[#8e8ea0] mt-1">
+                  {apiKeyQuota.unlimited ? (
+                    <>Provider-managed quota (check OpenRouter dashboard)</>
+                  ) : (
+                    <>Quota: {apiKeyQuota.remaining}/{apiKeyQuota.limit}</>
+                  )}
+                </p>
+              )}
             {apiKeyStatus === 'error' && (
               <p className="text-xs text-red-500">Invalid API key</p>
             )}
@@ -1385,9 +1657,9 @@ function SettingsModal({
             
             <p className="text-xs text-[#8e8ea0] flex items-center gap-1">
               {apiKeyValid ? (
-                <><Check className="w-3 h-3 text-green-500" /> Model selection enabled</>
+                <><Check className="w-3 h-3 text-green-500" /> Model selection enabled (uses your key)</>
               ) : (
-                <><span>🔒</span> Provide a valid API key to select models</>
+                <><span>🔒</span> Selecting a model will use the server API key unless you enter your own</>
               )}
             </p>
           </div>
