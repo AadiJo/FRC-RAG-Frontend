@@ -750,7 +750,7 @@ export function ChatInterface({ isGuest }: ChatInterfaceProps) {
             )}
 
             {/* First-login Tutorial / Onboarding */}
-            {tutorialOpen && !isGuest && (
+            {tutorialOpen && (
                 <OnboardingModal
                     onClose={completeTutorial}
                     onOpenSettings={() => setSettingsOpen(true)}

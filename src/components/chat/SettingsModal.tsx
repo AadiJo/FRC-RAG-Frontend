@@ -64,17 +64,15 @@ export function SettingsModal({
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [apiKeyQuota, setApiKeyQuota] = useState<ApiKeyQuota | null>(null);
     const [serverDefaultModel, setServerDefaultModel] = useState<string>('');
-
-    const effectiveDefaultModelId = (() => {
-        const freeModel = models.find(m => m.free);
-        if (freeModel) return freeModel.id;
-        return serverDefaultModel || '';
-    })();
+    const [defaultModelDisplay, setDefaultModelDisplay] = useState<string>('OpenAI: gpt-oss-20b');
 
     const DEFAULT_MODEL_NAME = (() => {
-        const m = models.find(x => x.id === effectiveDefaultModelId);
+        if (defaultModelDisplay) {
+            return `${defaultModelDisplay} (Server Default)`;
+        }
+        const m = models.find(x => x.id === serverDefaultModel);
         if (m) return `${m.name} (Server Default)`;
-        return serverDefaultModel ? `${serverDefaultModel} (Server Default)` : 'Server Default Model';
+        return serverDefaultModel ? `${serverDefaultModel} (Server Default)` : 'OpenAI: gpt-oss-20b (Server Default)';
     })();
 
     const validateKey = async () => {
@@ -152,6 +150,7 @@ export function SettingsModal({
                 if (cancelled) return;
                 if (data.models) setModels(data.models);
                 if (data.default_model) setServerDefaultModel(data.default_model || '');
+                if (data.default_model_display) setDefaultModelDisplay(data.default_model_display || 'OpenAI: gpt-oss-20b');
             } catch {
                 // Failed to load models, continue with empty list
             }
@@ -159,7 +158,7 @@ export function SettingsModal({
         return () => { cancelled = true; };
     }, [apiUrl]);
 
-    const selectedModelName = !apiKeyValid ? 'OpenAI: gpt-oss-20b (free)' : (models.find(m => m.id === model)?.name || (model ? model : DEFAULT_MODEL_NAME));
+    const selectedModelName = !apiKeyValid ? DEFAULT_MODEL_NAME : (models.find(m => m.id === model)?.name || (model ? model : DEFAULT_MODEL_NAME));
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150" onClick={onClose}>
