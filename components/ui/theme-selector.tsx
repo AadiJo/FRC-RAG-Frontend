@@ -73,7 +73,7 @@ export function ThemeSelector() {
             {presetKey && preset ? (
               <ThemeColorPreview
                 mode={themeState.currentMode}
-                preset={themeState.preset}
+                preset={presetKey!}
               />
             ) : null}
             <span className="ml-1">{displayText}</span>
