@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.32" />
+      <stop offset="0.5" stop-color="#6366f1" stop-opacity="0.24" />
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0.24" />
+    </linearGradient>
+  </defs>
+
+  <!-- rounded square background -->
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="#0b0b0b" />
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#bg)" />
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="12" />
+
+  <!-- Bot glyph: scaled and centered so it fills the square area -->
+  <g transform="translate(124 124) scale(11)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 8V4H8" />
+    <rect x="4" y="8" width="16" height="12" rx="2" />
+    <path d="M2 14h2" />
+    <path d="M20 14h2" />
+    <path d="M15 13v2" />
+    <path d="M9 13v2" />
+  </g>
+</svg>

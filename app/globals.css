@@ -1,0 +1,572 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+
+@source "../node_modules/streamdown/dist/index.js";
+
+/* Default CSS variables to avoid a flash of incorrect background
+   before the JS theme provider initializes. Values mirror the
+   default light theme in lib/config/theme.ts */
+:root {
+  /* Brand palette from provided image */
+  --color-eggshell: #EEEBD3; /* light eggshell */
+  --color-gold: #A98743; /* dark goldenrod */
+  --color-ink: #030918; /* ink / deep blue-black */
+
+  /* Map core UI tokens to the new palette for the default (light) theme */
+  --background: var(--color-eggshell);
+  --foreground: var(--color-ink);
+  --card: color-mix(in srgb, var(--color-eggshell) 92%, var(--color-gold) 8%);
+  --popover: var(--card);
+  --border: color-mix(in srgb, var(--color-ink) 10%, transparent 90%);
+  --input: color-mix(in srgb, var(--color-ink) 6%, transparent 94%);
+  --muted: color-mix(in srgb, var(--color-ink) 8%, var(--color-eggshell) 92%);
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --spacing-app-header: 56px;
+  --spacing-input-area: 134px;
+
+  @keyframes loading-dots {
+    0%,
+    100% {
+      opacity: 0;
+    }
+
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@theme inline {
+  /* Tailwind v4 font tokens map to active theme font variables.
+     Default to Geist families if active variables are not set, 
+     with generic system fallbacks for resilience. */
+  /* Override these to change the primary UI and code fonts. */
+  --active-font-sans:
+    "Metropolis", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --active-font-mono:
+    "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",
+    "Segoe UI Mono", "Courier New", monospace;
+
+  --font-sans: var(
+    --active-font-sans,
+    var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif)
+  );
+  --font-mono: var(
+    --active-font-mono,
+    var(--font-geist-mono, ui-monospace, monospace)
+  );
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Computed Shadow Variants */
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  --tracking-tighter: calc(var(--letter-spacing) - 0.05em);
+  --tracking-tight: calc(var(--letter-spacing) - 0.025em);
+  --tracking-normal: var(--letter-spacing);
+  --tracking-wide: calc(var(--letter-spacing) + 0.025em);
+  --tracking-wider: calc(var(--letter-spacing) + 0.05em);
+  --tracking-widest: calc(var(--letter-spacing) + 0.1em);
+
+  --spacing-scroll-area: calc(
+    -1 *
+    (var(--spacing-input-area) + var(--spacing-app-header))
+  );
+  --spacing-scroll-anchor-offset: 380px;
+  --spacing-scroll-anchor: calc(
+    var(--spacing-scroll-area) -
+    var(--spacing-scroll-anchor-offset) +
+    100dvh
+  );
+}
+
+* {
+  color-scheme: light dark;
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: var(--letter-spacing);
+  overscroll-behavior: none;
+  /* iOS Safari improvements */
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* iOS Safari specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    body {
+      /* Additional iOS Safari optimizations */
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* Prevent iOS Safari zoom on input focus by ensuring minimum 16px font-size */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="url"],
+    textarea,
+    select {
+      font-size: max(16px, 1rem) !important;
+    }
+  }
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-feature-settings: var(--default-mono-font-feature-settings);
+  font-variation-settings: var(--default-mono-font-variation-settings);
+}
+
+/* sonner toast */
+[data-sonner-toaster] > li {
+  width: 100%;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+}
+
+/* Hide scrollbar arrow buttons (WebKit/Blink). */
+*::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+*::-webkit-scrollbar-button:single-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+*::-webkit-scrollbar-button:vertical:decrement,
+*::-webkit-scrollbar-button:vertical:increment,
+*::-webkit-scrollbar-button:horizontal:decrement,
+*::-webkit-scrollbar-button:horizontal:increment {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+@utility scrollbar-model-selector {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-button {
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+    display: none;
+    -webkit-appearance: none;
+  }
+
+  &::-webkit-scrollbar-button:single-button {
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+  }
+
+  &::-webkit-scrollbar-button:vertical:decrement,
+  &::-webkit-scrollbar-button:vertical:increment,
+  &::-webkit-scrollbar-button:horizontal:decrement,
+  &::-webkit-scrollbar-button:horizontal:increment {
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+    display: none;
+    -webkit-appearance: none;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+    border-radius: 9999px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.6);
+  }
+}
+
+@utility scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+
+@utility scrollbar-gutter-both {
+  scrollbar-gutter: stable both-edges;
+}
+
+@layer utilities {
+  .markdown-body .katex {
+    font-size: 1.1em;
+  }
+
+  .markdown-body .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    margin-top: 1em;
+    margin-bottom: 1em;
+  }
+
+  .markdown-body .katex-display > .katex {
+    font-size: 1.21em;
+  }
+
+  .markdown-body .katex-display > .katex > .katex-html {
+    display: block;
+    position: relative;
+  }
+
+  .markdown-body .katex-display > .katex > .katex-html > .tag {
+    position: absolute;
+    right: 0;
+  }
+  /* Fix inline code background for better theme compatibility */
+  .markdown-body .rounded-sm.bg-primary-foreground.px-1.font-mono.text-sm {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /**
+   * Constrain images inside markdown tables to prevent column blow-out.
+   * Images in table cells are displayed as small thumbnails that don't
+   * break the table layout. Non-table images remain unchanged.
+   */
+  .markdown-body table img,
+  .prose table img {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 6rem; /* ~96px thumbnail */
+    object-fit: contain;
+    display: inline-block;
+    vertical-align: middle;
+    border-radius: 0.25rem;
+  }
+}
+
+/* Deep-blue theme for the model selector (scoped) */
+.model-selector-theme {
+  /* Dark, slightly blue-tinted near-black */
+  --sidebar: #030918; /* selector background */
+  --sidebar-accent: #030918; /* card background */
+  --sidebar-border: rgba(
+    28,
+    56,
+    110,
+    0.6
+  ); /* slightly stronger blue-tinted border */
+}
+
+/* Mobile-specific dark blue palette to match site styling */
+@media (max-width: 767px) {
+  .mobile-dark-blue {
+    /* Primary dark-blue background */
+    --background: #03102b;
+    --popover: #03102b;
+    --popover-foreground: #e9f4ff;
+    --card: #041426;
+    --card-foreground: #e9f4ff;
+    --accent: #0b4b9b;
+    --accent-foreground: #ffffff;
+    --muted-foreground: rgba(255, 255, 255, 0.75);
+    --border: rgba(255, 255, 255, 0.06);
+    --input: rgba(255, 255, 255, 0.04);
+    --ring: rgba(11, 75, 155, 0.6);
+    --sidebar: #02102b;
+  }
+}
+
+/* Non-mobile dark blue palette for desktop search palette */
+.dark-blue {
+  /* Primary dark-blue background */
+  --background: #03102b;
+  --popover: #03102b;
+  --popover-foreground: #e9f4ff;
+  --card: #041426;
+  --card-foreground: #e9f4ff;
+  --accent: #0b4b9b;
+  --accent-foreground: #ffffff;
+  --muted-foreground: rgba(255, 255, 255, 0.75);
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.04);
+  --ring: rgba(11, 75, 155, 0.6);
+  --sidebar: #02102b;
+}
+
+/* Fine-tune Command (search palette) styles for dark-blue theme */
+.dark-blue {
+  /* Input wrapper */
+}
+
+.dark-blue [data-slot="command"] {
+  background: var(--popover);
+  color: var(--popover-foreground);
+}
+
+.dark-blue [data-slot="command-input-wrapper"] {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dark-blue [data-slot="command-input"] {
+  color: var(--popover-foreground);
+}
+
+.dark-blue ::placeholder {
+  color: rgba(233, 244, 255, 0.65);
+  opacity: 1;
+}
+
+/* Command list items */
+.dark-blue [data-slot="command-item"] {
+  color: var(--popover-foreground);
+  background: transparent;
+}
+
+.dark-blue [data-slot="command-item"][data-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 72%, black 28%);
+  color: var(--accent-foreground);
+}
+
+.dark-blue [data-slot="command-item"]:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent 86%);
+}
+
+/* Group headings (Chats / Today / Last 7 Days labels) */
+.dark-blue [cmdk-group-heading],
+.dark-blue .cmdk-group-heading {
+  color: var(--muted-foreground);
+}
+
+/* Small controls on the right of items */
+.dark-blue [data-slot="command"] button {
+  color: var(--muted-foreground);
+}
+
+.dark-blue [data-slot="command"] button:hover {
+  color: var(--accent-foreground);
+}
+
+/* Close button adjustments */
+.dark-blue[data-slot="dialog-content"] > button {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+/* Keep mobile-dark-blue as alias for mobile-only fallback */
+@media (max-width: 767px) {
+  .mobile-dark-blue {
+    /* re-use desktop dark-blue CSS variables */
+  }
+}
+
+/* Shiny button animation (copied from frontend repo) */
+@keyframes shiny {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shiny-button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shiny 3s linear infinite;
+}
+
+.shiny-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shiny 3s linear infinite;
+}
+
+/* Frosted suggestion bubble used on the initial empty-state suggestions */
+.frosted-suggestion {
+  /* Slightly darker than before but still lighter than the page background.
+       Use a subtle blue tint instead of neutral white to give a cool frosted look. */
+  background-color: color-mix(
+    in srgb,
+    var(--color-background) 72%,
+    hsl(215 30% 68%) 28%
+  );
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(70, 90, 150, 0.06);
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color 160ms ease,
+    transform 120ms ease;
+}
+
+.frosted-suggestion:hover,
+.frosted-suggestion:focus {
+  /* Match suggestion card hover: use accent-tinted background and accent foreground text */
+  background-color: color-mix(
+    in srgb,
+    var(--color-accent) 12%,
+    var(--color-background) 88%
+  );
+  color: var(--color-accent-foreground);
+  border-color: color-mix(
+    in srgb,
+    var(--color-accent) 10%,
+    var(--color-border) 90%
+  );
+  /* Do not translate on hover (prevents clipping); indicate hover via shadow instead */
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Simple utility classes to apply the brand palette where needed */
+.bg-egg {
+  background-color: var(--color-eggshell) !important;
+}
+.bg-gold {
+  background-color: var(--color-gold) !important;
+}
+.bg-ink {
+  background-color: var(--color-ink) !important;
+}
+.text-egg {
+  color: var(--color-eggshell) !important;
+}
+.text-gold {
+  color: var(--color-gold) !important;
+}
+.text-ink {
+  color: var(--color-ink) !important;
+}
+.border-egg {
+  border-color: var(--color-eggshell) !important;
+}
+.border-gold {
+  border-color: var(--color-gold) !important;
+}
+.border-ink {
+  border-color: var(--color-ink) !important;
+}
+
+/* Subtle card variants that preserve readability */
+.card-egg {
+  background-color: color-mix(in srgb, var(--color-eggshell) 94%, var(--color-ink) 6%);
+  color: var(--color-ink);
+}
+.card-gold {
+  background-color: color-mix(in srgb, var(--color-gold) 86%, var(--color-eggshell) 14%);
+  color: var(--color-ink);
+}
+

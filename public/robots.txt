@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /auth/error
+Disallow: /chat/
+Disallow: /share/
+Disallow: /tasks
+Disallow: /settings/
+Allow: /
+Allow: /auth$
+
+Sitemap: https://frcrag.johari-dev.com/sitemap.xml

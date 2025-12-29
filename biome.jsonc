@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/core", "ultracite/next"],
+  "files": {
+    "includes": [
+      "src/**/*",
+      "tests/**/*",
+      "scripts/**/*",
+      "next.config.js",
+      "postcss.config.js",
+      "tailwind.config.js"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "useFilenamingConvention": "off",
+        "noMagicNumbers": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off"
+      },
+      "nursery": {
+        "noUnnecessaryConditions": "off",
+        "useMaxParams": "off"
+      }
+    },
+    "domains": {
+      "next": "recommended"
+    }
+  }
+}
