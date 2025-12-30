@@ -1,6 +1,7 @@
 "use client";
 
 import type { UIMessage } from "@ai-sdk/react";
+import { Analytics } from "@vercel/analytics/react";
 import {
   createChatStore,
   Provider,
@@ -1513,6 +1514,7 @@ export default function Chat() {
   return (
     <Provider store={chatStore}>
       <ChatContent />
+      <Analytics />
     </Provider>
   );
 }
