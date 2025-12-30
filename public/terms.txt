@@ -1,0 +1,34 @@
+Terms of Service for FRC RAG
+
+Effective date: December 29, 2025
+
+1. Acceptance of Terms
+These Terms of Service ("Terms") govern your use of FRC RAG's website and services (the "Service"). By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
+
+2. Eligibility
+You must be at least the minimum legal age in your jurisdiction to form a binding contract to use the Service. If you are using the Service on behalf of an organization, you represent that you have authority to bind that organization.
+
+3. Accounts and Access
+- Registration: Some features require an account. You must provide accurate information and keep credentials secure.
+- Account responsibility: You are responsible for all activity under your account. Notify FRC RAG promptly of unauthorized use.
+
+4. User Content and Conduct
+- User content: You retain ownership of content you submit, but by submitting content you grant FRC RAG a license to host, use, and display that content as necessary to provide the Service.
+
+5. Disclaimers
+The Service is provided "as is" and "as available" without warranties of any kind. To the fullest extent permitted by applicable law, FRC RAG disclaims all warranties, whether express, implied, statutory, or otherwise.
+
+6. Limitation of Liability
+To the maximum extent permitted by law, FRC RAG is not liable for indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. Our aggregate liability for direct damages is limited to the extent permitted by law.
+
+7. Indemnification
+You agree to indemnify and hold harmless FRC RAG and its affiliates from claims arising out of your use of the Service, violation of these Terms, or infringement of third-party rights.
+
+8. Governing Law and Disputes
+These Terms are governed by the laws of the jurisdiction specified by FRC RAG (or, if not specified, the laws governing FRC RAG's principal place of business). Disputes will be resolved in accordance with those laws.
+
+9. Changes to Terms
+FRC RAG may modify these Terms. If material changes are made, FRC RAG will provide notice. Continued use after changes constitutes acceptance.
+
+10. Contact
+For questions about these Terms, please use the contact form or channels provided on the FRC RAG website.

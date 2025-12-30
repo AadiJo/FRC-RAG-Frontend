@@ -1,0 +1,31 @@
+Privacy Policy for FRC RAG
+
+Effective date: December 29, 2025
+
+1. Introduction
+FRC RAG provides an AI-assisted retrieval-augmented generation service and related website (the "Service"). This Privacy Policy explains what information FRC RAG collects, how FRC RAG uses it, and the choices you have. By using the Service, you agree to the practices described in this policy.
+
+2. Information Collected by FRC RAG
+- Information you provide directly: When you create an account, participate in chats, or otherwise use interactive features, you may provide identifiers (name or username), profile details, and the content you submit (messages, files, prompts, attachments).
+- Device and technical information: FRC RAG collects device identifiers, browser or client type and version, IP addresses, operating system, and other diagnostic data.
+- Cookies and similar technologies: FRC RAG uses cookies and local storage for session management, preferences, and analytics.
+
+3. How FRC RAG Uses Information
+FRC RAG uses collected information to:
+- Provide, maintain, and operate the Service.
+- Process and respond to your requests and messages.
+- Improve and personalize the Service, develop new features, and measure performance.
+- Detect, prevent, and respond to fraud, abuse, security incidents, and legal claims.
+
+4. Data Security and Retention
+FRC RAG uses reasonable administrative, technical, and physical safeguards to protect data. No method of transmission or storage is completely secure; absolute security cannot be guaranteed. FRC RAG retains personal data as long as necessary to provide the Service, meet legal obligations, resolve disputes, and enforce agreements.
+
+5. Your Choices
+- Account data: You may access or update certain account information in your account settings. You can request deletion of your account and associated personal data; deletion requests will be processed in accordance with applicable law and FRC RAG's internal retention policies.
+- Cookies and tracking: You can manage or disable cookies via your browser or device settings, though some features may require cookies to function.
+
+6. Changes to this Policy
+FRC RAG may update this Privacy Policy. When updates are made, the effective date will be revised and, where required, notice will be provided. Continued use of the Service after changes constitutes acceptance of the updated policy.
+
+7. Contact
+If you have questions about this policy, please use the contact form or support channels available on the FRC RAG website.
