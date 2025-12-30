@@ -625,6 +625,14 @@ export default function Home() {
             >
               Advait Johari
             </a>
+            {" "}
+            —{" "}
+            <a
+              className="underline hover:text-blue-400"
+              href="/privacy-policy"
+            >
+              Privacy Policy
+            </a>
           </span>
         </footer>
       </div>
