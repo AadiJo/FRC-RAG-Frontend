@@ -17,6 +17,9 @@ const getConvexHostname = (): string | null => {
 const nextConfig: NextConfig = {
   // Disable React Strict Mode to prevent double-invoking effects
   reactStrictMode: false,
+  // Keep native Node dependencies external (not bundled), so Route Handlers can
+  // load platform binaries at runtime.
+  serverExternalPackages: ["@napi-rs/canvas"],
   experimental: {
     useCache: true,
     optimizePackageImports: [

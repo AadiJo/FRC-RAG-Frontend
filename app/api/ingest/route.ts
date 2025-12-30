@@ -325,40 +325,38 @@ async function extractTextFromPDF(
     // side text extraction works without a browser-like DOM.
     try {
       if (!globalThis.DOMMatrix) {
-        let canvasModule: any = undefined;
+        type CanvasModule = typeof import("@napi-rs/canvas");
+        let canvasModule: CanvasModule | undefined;
         try {
-          // Try to require the native module at runtime without letting Turbopack
-          // statically analyze or bundle it. Using eval('require') prevents the
-          // bundler from resolving the import during build.
-          try {
-            // eslint-disable-next-line no-eval
-            const req = eval("typeof require !== 'undefined' ? require : undefined");
-            if (req) {
-              const pkg = ["@napi-rs", "/canvas"].join("");
-              canvasModule = req(pkg);
-            } else {
-              // Fallback: try createRequire at runtime if available
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
-              const { createRequire } = await import("module");
-              const r = createRequire(import.meta.url);
-              try {
-                const pkg = ["@napi-rs", "/canvas"].join("");
-                canvasModule = r(pkg);
-              } catch (e) {
-                // optional dependency not installed
-              }
-            }
-          } catch (e) {
-            // require/import not available or module not installed
-          }
-        } catch (e) {
-          // ignore unexpected errors
+          canvasModule = await import("@napi-rs/canvas");
+        } catch (importError) {
+          // Optional dependency not installed, not present in the deployed output,
+          // or native binary failed to load.
+          const envInfo = {
+            platform: typeof process !== "undefined" ? process.platform : "unknown",
+            arch: typeof process !== "undefined" ? process.arch : "unknown",
+            nodeVersion: typeof process !== "undefined" ? process.version : "unknown",
+          };
+          console.warn(
+            "[Ingest] Failed to import @napi-rs/canvas:",
+            importError,
+            envInfo
+          );
         }
 
         if (canvasModule?.DOMMatrix) {
-          (globalThis as any).DOMMatrix = canvasModule.DOMMatrix;
-          if (canvasModule.ImageData) (globalThis as any).ImageData = canvasModule.ImageData;
-          if (canvasModule.Path2D) (globalThis as any).Path2D = canvasModule.Path2D;
+          (globalThis as unknown as { DOMMatrix?: CanvasModule["DOMMatrix"] }).DOMMatrix =
+            canvasModule.DOMMatrix;
+
+          if (canvasModule.ImageData) {
+            (globalThis as unknown as { ImageData?: CanvasModule["ImageData"] }).ImageData =
+              canvasModule.ImageData;
+          }
+
+          if (canvasModule.Path2D) {
+            (globalThis as unknown as { Path2D?: CanvasModule["Path2D"] }).Path2D =
+              canvasModule.Path2D;
+          }
         } else {
           console.warn(
             "[Ingest] DOMMatrix polyfill not available. Install @napi-rs/canvas on the server to enable PDF rendering in Node.js."
