@@ -52,6 +52,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.ngrok-free.dev",
       },
+      {
+        protocol: "https",
+        hostname: "api-frcrag.johari-dev.com",
+      },
       // Add Convex hostname dynamically
       ...(() => {
         const convexHostname = getConvexHostname();

@@ -10,14 +10,14 @@ export const APP_DESCRIPTION =
 export const APP_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-export const MODEL_DEFAULT = "openai/gpt-oss-120b";
+export const MODEL_DEFAULT = "openai/gpt-oss-20b";
 
 // Models available without any API keys (free tier)
 // These are the only models users can access if they haven't added any provider API keys
 export const FREE_TIER_MODELS = [
   "openai/gpt-oss-20b", // Groq - fast inference
-  "z-ai/glm-4.5-air:free", // OpenRouter free tier
-  "deepseek/deepseek-chat-v3-0324:free", // OpenRouter free tier
+  "llama-3.3-70b-versatile", // Groq - Llama 3.3 70B (now guest-accessible)
+  "openai/gpt-oss-20b:free", // OpenRouter free tier
 ] as const;
 
 export const RECOMMENDED_MODELS = [

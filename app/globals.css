@@ -10,8 +10,8 @@
    default light theme in lib/config/theme.ts */
 :root {
   /* Brand palette from provided image */
-  --color-eggshell: #EEEBD3; /* light eggshell */
-  --color-gold: #A98743; /* dark goldenrod */
+  --color-eggshell: #eeebd3; /* light eggshell */
+  --color-gold: #a98743; /* dark goldenrod */
   --color-ink: #030918; /* ink / deep blue-black */
 
   /* Map core UI tokens to the new palette for the default (light) theme */
@@ -562,11 +562,18 @@ samp {
 
 /* Subtle card variants that preserve readability */
 .card-egg {
-  background-color: color-mix(in srgb, var(--color-eggshell) 94%, var(--color-ink) 6%);
+  background-color: color-mix(
+    in srgb,
+    var(--color-eggshell) 94%,
+    var(--color-ink) 6%
+  );
   color: var(--color-ink);
 }
 .card-gold {
-  background-color: color-mix(in srgb, var(--color-gold) 86%, var(--color-eggshell) 14%);
+  background-color: color-mix(
+    in srgb,
+    var(--color-gold) 86%,
+    var(--color-eggshell) 14%
+  );
   color: var(--color-ink);
 }
-

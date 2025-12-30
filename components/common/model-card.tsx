@@ -3,10 +3,6 @@
 import {
   BrainIcon,
   CurrencyDollarIcon,
-  EyeIcon,
-  FilePdfIcon,
-  ImagesIcon,
-  KeyIcon,
   PushPinSimpleIcon,
   PushPinSimpleSlashIcon,
 } from "@phosphor-icons/react";
@@ -52,7 +48,7 @@ type ModelCardProps = {
   onToggleFavorite: (modelId: string) => void;
 };
 
-export const ModelCard = React.memo(function ModelCard({
+export const ModelCard = React.memo(function ModelCardInner({
   model,
   isSelected,
   isFavorite,
@@ -64,6 +60,11 @@ export const ModelCard = React.memo(function ModelCard({
   const provider = PROVIDERS_OPTIONS.find(
     (p) => p.id === (model.displayProvider || model.provider)
   );
+
+  const apiProvider = useMemo(() => {
+    const apiProviderId = model.provider === "groq" ? "groq" : "openrouter";
+    return PROVIDERS_OPTIONS.find((p) => p.id === apiProviderId);
+  }, [model.provider]);
 
   // Feature flags
   // Pre-compute features map for O(1) lookups
@@ -80,10 +81,7 @@ export const ModelCard = React.memo(function ModelCard({
   );
 
   // Feature flags - O(1) lookups
-  const hasFileUpload = featuresMap["file-upload"];
-  const hasPdfProcessing = featuresMap["pdf-processing"];
-  const hasReasoning = featuresMap["reasoning"];
-  const hasImageGeneration = featuresMap["image-generation"];
+  const hasReasoning = featuresMap.reasoning;
   // Style definitions for feature icons
   const iconWrapperBaseClasses =
     "relative flex h-5 w-5 items-center justify-center overflow-hidden rounded-md cursor-help";
@@ -92,10 +90,7 @@ export const ModelCard = React.memo(function ModelCard({
   const iconSizeClasses = "h-3 w-3";
 
   // Color classes for features
-  const visionColorClasses = "text-teal-600 dark:text-teal-400";
-  const pdfColorClasses = "text-indigo-600 dark:text-indigo-400";
   const reasoningColorClasses = "text-pink-600 dark:text-pink-400";
-  const imageGenerationColorClasses = "text-orange-600 dark:text-orange-400";
 
   const handleCardClick = useCallback(() => {
     if (!isDisabled) {
@@ -115,6 +110,16 @@ export const ModelCard = React.memo(function ModelCard({
     },
     [isFavorite, isLastFavorite, onToggleFavorite, model.id]
   );
+
+  const pinTooltipLabel = useMemo(() => {
+    if (isFavorite && isLastFavorite) {
+      return "Must keep at least one favorite model";
+    }
+    if (isFavorite) {
+      return "Unpin model";
+    }
+    return "Pin model";
+  }, [isFavorite, isLastFavorite]);
 
   // Helper function to format display name with subName
   const getDisplayName = useCallback(
@@ -141,6 +146,26 @@ export const ModelCard = React.memo(function ModelCard({
     () => model.displayProvider || model.provider,
     [model.displayProvider, model.provider]
   );
+
+  // Check if model is paid - based on isFree property or ":free" suffix
+  // Models are paid if they are NOT explicitly free
+  const isPaidModel = useMemo(() => {
+    // If isFree is explicitly true, it's free
+    if (model.isFree === true) {
+      return false;
+    }
+    // If model ID ends with :free, it's free
+    if (model.id.endsWith(":free")) {
+      return false;
+    }
+    // Premium models are always paid (when not using own API key)
+    if (model.premium) {
+      return true;
+    }
+    // Non-Groq models (OpenRouter) without :free suffix are paid
+    // Groq models are free to use (they use Groq's free tier)
+    return model.provider !== "groq";
+  }, [model.isFree, model.id, model.premium, model.provider]);
 
   // Memoized tooltip content
   const { tooltipContentParts, tooltipDisplay } = useMemo(() => {
@@ -175,22 +200,7 @@ export const ModelCard = React.memo(function ModelCard({
       </span>
     );
 
-    if (model.provider === "openrouter" && model.isFree !== true) {
-      contentParts.push(
-        <span className="flex items-center gap-1" key="paid">
-          <CurrencyDollarIcon className="size-3" weight="bold" />
-          Paid
-        </span>
-      );
-    }
-    if (model.apiKeyUsage.userKeyOnly) {
-      contentParts.push(
-        <span className="flex items-center gap-1" key="apikey">
-          <KeyIcon className="size-3" />
-          Requires API Key
-        </span>
-      );
-    }
+    // Intentionally keep the tooltip minimal (reasoning-only badge policy).
 
     const tooltipNode = (
       <div className="flex items-center gap-1.5 font-medium text-xs">
@@ -206,14 +216,7 @@ export const ModelCard = React.memo(function ModelCard({
     );
 
     return { tooltipContentParts: contentParts, tooltipDisplay: tooltipNode };
-  }, [
-    displayName,
-    providerId,
-    model.provider,
-    model.isFree,
-    model.apiKeyUsage.userKeyOnly,
-    isDisabled,
-  ]);
+  }, [displayName, providerId, model.provider, isDisabled]);
 
   return (
     <div className="group relative" data-state="closed">
@@ -234,26 +237,14 @@ export const ModelCard = React.memo(function ModelCard({
             onClick={handleCardClick}
             type="button"
           >
-            <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
-              {model.provider === "openrouter" && model.isFree !== true && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center">
-                      <CurrencyDollarIcon
-                        className="size-3.5 text-amber-500"
-                        weight="bold"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>Paid model on {providerId}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {model.apiKeyUsage.userKeyOnly ? (
-                <KeyIcon className="size-3.5 text-muted-foreground" />
-              ) : null}
-            </div>
+            {isPaidModel ? (
+              <div className="absolute top-1.5 right-1.5 flex items-center">
+                <CurrencyDollarIcon
+                  className="size-3.5 text-amber-500"
+                  weight="bold"
+                />
+              </div>
+            ) : null}
             <div className="flex w-full flex-col items-center justify-center gap-1 font-medium transition-colors">
               {provider ? (
                 <ProviderIcon
@@ -277,48 +268,6 @@ export const ModelCard = React.memo(function ModelCard({
             </div>
 
             <div className="absolute inset-x-0 bottom-2 flex w-full items-center justify-center gap-2">
-              {hasFileUpload ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={cn(iconWrapperBaseClasses, visionColorClasses)}
-                    >
-                      <div className={iconOverlayClasses} />
-                      <EyeIcon
-                        className={cn(
-                          iconSizeClasses,
-                          "relative",
-                          visionColorClasses
-                        )}
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>Supports Image Upload and Analysis</p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-              {hasPdfProcessing ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={cn(iconWrapperBaseClasses, pdfColorClasses)}
-                    >
-                      <div className={iconOverlayClasses} />
-                      <FilePdfIcon
-                        className={cn(
-                          iconSizeClasses,
-                          "relative",
-                          pdfColorClasses
-                        )}
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>Supports PDF Upload and Analysis</p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
               {hasReasoning ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -343,27 +292,20 @@ export const ModelCard = React.memo(function ModelCard({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
-              {hasImageGeneration ? (
+
+              {apiProvider ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div
-                      className={cn(
-                        iconWrapperBaseClasses,
-                        imageGenerationColorClasses
-                      )}
-                    >
+                    <div className={cn(iconWrapperBaseClasses)}>
                       <div className={iconOverlayClasses} />
-                      <ImagesIcon
-                        className={cn(
-                          iconSizeClasses,
-                          "relative",
-                          imageGenerationColorClasses
-                        )}
+                      <ProviderIcon
+                        className={cn(iconSizeClasses, "relative")}
+                        provider={apiProvider}
                       />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p>Can generate images</p>
+                    <p>{apiProvider.id}</p>
                   </TooltipContent>
                 </Tooltip>
               ) : null}
@@ -398,13 +340,7 @@ export const ModelCard = React.memo(function ModelCard({
             </button>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p>
-              {isFavorite && isLastFavorite
-                ? "Must keep at least one favorite model"
-                : isFavorite
-                  ? "Unpin model"
-                  : "Pin model"}
-            </p>
+            <p>{pinTooltipLabel}</p>
           </TooltipContent>
         </Tooltip>
       </div>

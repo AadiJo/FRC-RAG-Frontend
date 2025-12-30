@@ -1,7 +1,7 @@
 import Google from "@auth/core/providers/google";
 import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { convexAuth } from "@convex-dev/auth/server";
-import { MODEL_DEFAULT, RECOMMENDED_MODELS } from "../lib/config";
+import { FREE_TIER_MODELS, MODEL_DEFAULT } from "../lib/config";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { rateLimiter } from "./rateLimiter";
@@ -11,8 +11,8 @@ const initializeUserFields = () => ({
   preferredModel: MODEL_DEFAULT,
   // By default no models are disabled – an empty array means all are enabled
   disabledModels: [],
-  // Initialize with recommended models as favorites
-  favoriteModels: [...RECOMMENDED_MODELS],
+  // Initialize with the guest-available models as favorites
+  favoriteModels: [...FREE_TIER_MODELS],
 });
 
 // Helper function to initialize rate limits for new user

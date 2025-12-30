@@ -20,6 +20,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { Message } from "@/convex/schema/message";
 import { FREE_TIER_MODELS, MODELS_MAP } from "@/lib/config";
+import { isDebugRagHttpEnabled } from "@/lib/debug";
 import { limitDepth } from "@/lib/depth-limiter";
 import { ERROR_CODES } from "@/lib/error-codes";
 import {
@@ -48,6 +49,45 @@ import { sanitizeUserInput } from "@/lib/sanitize";
 
 // Maximum allowed duration for streaming (in seconds)
 export const maxDuration = 300;
+
+const serializeUnknownErrorForLog = (
+  error: unknown
+): Record<string, unknown> => {
+  if (error instanceof Error) {
+    const base: Record<string, unknown> = {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+
+    if (error.cause) {
+      base.cause = serializeUnknownErrorForLog(error.cause);
+    }
+
+    for (const [key, value] of Object.entries(error)) {
+      if (!(key in base)) {
+        base[key] = value;
+      }
+    }
+
+    return base;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const obj = error as Record<string, unknown>;
+    const out: Record<string, unknown> = {
+      kind: (error as { constructor?: { name?: string } })?.constructor?.name,
+    };
+
+    for (const [key, value] of Object.entries(obj)) {
+      out[key] = value;
+    }
+
+    return out;
+  }
+
+  return { value: String(error) };
+};
 
 /**
  * Helper function to save an error message as an assistant message
@@ -166,47 +206,6 @@ const REASONING_EFFORT_CONFIG = {
   },
 } as const;
 
-/**
- * Maps reasoning effort to provider-specific configuration
- * Uses feature-based detection instead of hardcoded patterns
- */
-const mapReasoningEffortToProviderConfig = (
-  provider: string,
-  effort: ReasoningEffort
-): Record<string, unknown> => {
-  const config = REASONING_EFFORT_CONFIG[effort];
-
-  switch (provider) {
-    case "openai":
-      return { reasoningEffort: config.effort };
-
-    case "anthropic":
-      return {
-        thinking: {
-          budgetTokens: config.tokens,
-        },
-      };
-
-    case "google":
-    case "gemini":
-      return {
-        thinkingConfig: {
-          thinkingBudget: config.tokens,
-        },
-      };
-
-    case "openrouter":
-      return {
-        reasoning: {
-          effort: config.effort,
-        },
-      };
-
-    default:
-      return {};
-  }
-};
-
 type ChatRequest = {
   messages: UIMessage[];
   chatId: Id<"chats">;
@@ -220,18 +219,24 @@ type ChatRequest = {
   userInfo?: { timezone?: string };
 };
 
-/**
- * Helper function to check if a model should have thinking enabled
- * based on its features configuration
- */
-const shouldEnableThinking = (modelId: string): boolean => {
-  const model = MODELS_MAP[modelId];
-  if (!model) {
-    return false;
+const stripReasoningFromModelMessages = (
+  modelMessages: ReturnType<typeof convertToModelMessages>
+): ReturnType<typeof convertToModelMessages> => {
+  const out: ReturnType<typeof convertToModelMessages> = [];
+
+  for (const message of modelMessages) {
+    const record = message as unknown as Record<string, unknown>;
+    if (!("reasoning" in record)) {
+      out.push(message);
+      continue;
+    }
+
+    const clone: Record<string, unknown> = { ...record };
+    delete clone.reasoning;
+    out.push(clone as unknown as (typeof modelMessages)[number]);
   }
 
-  const reasoningFeature = model.features?.find((f) => f.id === "reasoning");
-  return reasoningFeature?.enabled === true;
+  return out;
 };
 
 // Helper function to check if a model supports tool calling - currently unused after connector removal
@@ -245,14 +250,38 @@ const _supportsToolCalling = (
 
 // Build Groq-specific provider options
 const buildGroqProviderOptions = (
-  _modelId: string,
-  _reasoningEffort?: ReasoningEffort
+  modelId: string,
+  reasoningEffort?: ReasoningEffort
 ): GroqProviderOptions => {
-  const options: GroqProviderOptions = {};
+  const model = MODELS_MAP[modelId];
+  if (!model) {
+    return {};
+  }
 
-  // Groq doesn't have built-in reasoning config, but we track it for metadata
-  // The reasoning middleware handles extraction for reasoning models
-  return options;
+  // Check if model has reasoning feature enabled
+  const hasReasoningFeature = model.features?.some(
+    (f) => f.id === "reasoning" && f.enabled === true
+  );
+
+  // Only add reasoning options for models with reasoning enabled
+  if (hasReasoningFeature && reasoningEffort) {
+    // GPT-OSS models support low/medium/high
+    // Qwen 3 32B supports none/default
+    const isGptOss = modelId.includes("gpt-oss");
+    if (isGptOss) {
+      return {
+        reasoningFormat: "parsed",
+        reasoningEffort, // low, medium, high
+      } as GroqProviderOptions;
+    }
+    // For other reasoning models like Qwen, use default
+    return {
+      reasoningFormat: "parsed",
+      reasoningEffort: "default",
+    } as GroqProviderOptions;
+  }
+
+  return {};
 };
 
 const buildOpenRouterProviderOptions = (
@@ -260,17 +289,23 @@ const buildOpenRouterProviderOptions = (
   reasoningEffort?: ReasoningEffort
 ): Record<string, unknown> => {
   const options: Record<string, unknown> = {};
+  const model = MODELS_MAP[modelId];
 
-  // Check if model supports reasoning using feature-based detection
-  if (shouldEnableThinking(modelId) && reasoningEffort) {
-    const reasoningConfig = mapReasoningEffortToProviderConfig(
-      "openrouter",
-      reasoningEffort
-    );
+  if (!model) {
+    return options;
+  }
 
-    if (reasoningConfig.reasoning) {
-      options.reasoning = reasoningConfig.reasoning;
-    }
+  // Check if model has reasoning feature with supportsEffort flag
+  const reasoningFeature = model.features?.find((f) => f.id === "reasoning");
+  const hasReasoningEnabled = reasoningFeature?.enabled === true;
+  const supportsEffort =
+    (reasoningFeature as { supportsEffort?: boolean })?.supportsEffort === true;
+
+  // Only pass reasoning config if model supports configurable effort
+  if (hasReasoningEnabled && supportsEffort && reasoningEffort) {
+    options.reasoning = {
+      effort: reasoningEffort,
+    };
   }
 
   return options;
@@ -318,6 +353,11 @@ export async function POST(req: Request) {
     if (!selectedModel) {
       return createErrorResponse(new Error("Invalid 'model' provided."));
     }
+
+    const selectedModelSupportsReasoning =
+      selectedModel.features?.some(
+        (feature) => feature.id === "reasoning" && feature.enabled === true
+      ) ?? false;
 
     const token = await convexAuthNextjsToken();
 
@@ -376,9 +416,15 @@ export async function POST(req: Request) {
     }
 
     // Determine if we should use a user-provided API key
+    // Use user key if:
+    // 1. Model requires user key only (userKeyOnly) and user has one
+    // 2. User has set their key to priority mode
+    // 3. User has an API key for this provider and model allows user keys
     const useUserKey = Boolean(
-      (apiKeyUsage?.userKeyOnly && userApiKey) ||
-        (keyEntry?.mode === "priority" && userApiKey)
+      userApiKey &&
+        (apiKeyUsage?.userKeyOnly ||
+          keyEntry?.mode === "priority" ||
+          apiKeyUsage?.allowUserKey)
     );
 
     // Reject early if model requires user key only but no user API key provided
@@ -386,13 +432,20 @@ export async function POST(req: Request) {
       return createErrorResponse(new Error("user_key_required"));
     }
 
-    // --- Free Tier Model Check ---
-    // If user has no API keys at all, they can only use free tier models
+    // --- Model Access Check ---
+    // Determine if user can access this model based on:
+    // 1. Free tier models (3 guest models) - always available, use server credentials
+    // 2. All other models - require user to have the correct provider's API key (groq or openrouter)
     const hasAnyApiKey = Array.isArray(userKeys) && userKeys.length > 0;
     const FREE_TIER_MODELS_SET = new Set<string>(FREE_TIER_MODELS);
     const isFreeTierModel = FREE_TIER_MODELS_SET.has(selectedModel.id);
 
-    if (!(hasAnyApiKey || isFreeTierModel)) {
+    // Model access logic:
+    // - Free tier: always allowed (use server credentials)
+    // - All other models: require user to have appropriate API key
+    const modelRequiresUserApiKey = !isFreeTierModel;
+
+    if (modelRequiresUserApiKey && !hasAnyApiKey) {
       return createErrorResponse(
         new Error(
           "This model requires an API key. Please add your API key in settings to use this model."
@@ -500,7 +553,7 @@ export async function POST(req: Request) {
     let ragContext: RAGContextResponse | null = null;
     let finalSystemPrompt: string;
 
-    console.log("[RAG] enableRAG:", enableRAG);
+    if (isDebugRagHttpEnabled()) console.log("[RAG] enableRAG:", enableRAG);
 
     if (enableRAG) {
       // Extract the last user message for RAG query
@@ -511,10 +564,12 @@ export async function POST(req: Request) {
           .map((p) => p.text)
           .join("") || "";
 
-      console.log("[RAG] userQuery:", userQuery.slice(0, 100));
+      if (isDebugRagHttpEnabled())
+        console.log("[RAG] userQuery:", userQuery.slice(0, 100));
 
       if (userQuery) {
-        console.log("[RAG] Fetching RAG context...");
+        if (isDebugRagHttpEnabled())
+          console.log("[RAG] Fetching RAG context...");
         // Pass user ID for fused retrieval (global corpus + user documents)
         ragContext = await fetchRAGContext(userQuery, {
           k: 15,
@@ -522,14 +577,16 @@ export async function POST(req: Request) {
           signal: req.signal,
           userId: user?._id, // Include user ID for personalized retrieval
         });
-        console.log("[RAG] RAG context received:", ragContext ? "yes" : "no");
-        if (ragContext) {
-          console.log("[RAG] Context length:", ragContext.context?.length);
-          console.log("[RAG] Images count:", ragContext.images?.length);
-          console.log(
-            "[RAG] Image map keys:",
-            Object.keys(ragContext.image_map || {}).length
-          );
+        if (isDebugRagHttpEnabled()) {
+          console.log("[RAG] RAG context received:", ragContext ? "yes" : "no");
+          if (ragContext) {
+            console.log("[RAG] Context length:", ragContext.context?.length);
+            console.log("[RAG] Images count:", ragContext.images?.length);
+            console.log(
+              "[RAG] Image map keys:",
+              Object.keys(ragContext.image_map || {}).length
+            );
+          }
         }
       }
 
@@ -688,6 +745,11 @@ export async function POST(req: Request) {
     let wasUserKeyUsed = false;
     let errorMessageSaved = false;
 
+    const modelMessages = convertToModelMessages(messages);
+    const modelMessagesForProvider = selectedModelSupportsReasoning
+      ? modelMessages
+      : stripReasoningFromModelMessages(modelMessages);
+
     const stream = createUIMessageStream({
       originalMessages: messages,
       async execute({ writer }) {
@@ -707,7 +769,7 @@ export async function POST(req: Request) {
           const streamResult = streamText({
             model: selectedModel.api_sdk,
             system: finalSystemPrompt,
-            messages: convertToModelMessages(messages),
+            messages: modelMessagesForProvider,
             tools: toolset,
             stopWhen: stepCountIs(20),
             experimental_transform: smoothStream({
@@ -1045,9 +1107,12 @@ export async function POST(req: Request) {
 
         try {
           if (wasUserKeyUsed) {
+            // Use the correct API key provider (groq for Groq models, openrouter for all others)
+            const apiKeyProviderForUsage =
+              selectedModel.provider === "groq" ? "groq" : "openrouter";
             await fetchMutation(
               api.api_keys.incrementUserApiKeyUsage,
-              { provider: selectedModel.provider },
+              { provider: apiKeyProviderForUsage },
               { token }
             );
           } else if (!selectedModel.skipRateLimit) {
@@ -1065,6 +1130,64 @@ export async function POST(req: Request) {
         }
       },
       onError: (error) => {
+        // Log full error for debugging (include nested response if available)
+        try {
+          console.error("[CHAT][STREAM][ERROR]", {
+            provider: selectedModel.provider,
+            modelId: selectedModel.id,
+            error: serializeUnknownErrorForLog(error),
+          });
+        } catch (logErr) {
+          console.error("[CHAT][STREAM][ERROR] failed to log error:", logErr);
+        }
+
+        // If error contains a `.response` with readable body, try to log it too
+        try {
+          // @ts-expect-error - defensive access
+          const resp = error?.response;
+          if (resp) {
+            try {
+              // resp may be a Response-like object
+              const status = resp.status ?? resp.statusCode ?? null;
+              let bodyStr = "<unavailable>";
+              if (typeof resp.text === "function") {
+                // resp.text may be async but error handlers are sync; attempt best-effort
+                resp
+                  .text()
+                  .then((b: string) =>
+                    console.error(
+                      "[CHAT][STREAM][ERROR] response body:",
+                      b.length > 2000 ? `${b.slice(0, 2000)}... [truncated]` : b
+                    )
+                  )
+                  .catch(() =>
+                    console.error(
+                      "[CHAT][STREAM][ERROR] failed to read response.text()"
+                    )
+                  );
+              } else if (resp.body) {
+                try {
+                  bodyStr = JSON.stringify(resp.body);
+                } catch {
+                  bodyStr = String(resp.body);
+                }
+                console.error(
+                  "[CHAT][STREAM][ERROR] response body:",
+                  bodyStr.slice(0, 2000)
+                );
+              }
+              console.error("[CHAT][STREAM][ERROR] response status:", status);
+            } catch (e) {
+              console.error(
+                "[CHAT][STREAM][ERROR] failed to log nested response:",
+                e
+              );
+            }
+          }
+        } catch {
+          // ignore logging failures
+        }
+
         // First, try to detect provider-specific error patterns
         const detectedError = detectProviderErrorFromObject(
           error,
@@ -1073,11 +1196,23 @@ export async function POST(req: Request) {
 
         if (detectedError) {
           // Return the provider-specific user-friendly message
+          console.error(
+            "[CHAT][STREAM][ERROR] detected provider error:",
+            detectedError
+          );
           return detectedError.userFriendlyMessage;
         }
 
-        // Fallback to original error handling
-        const { errorPayload } = createStreamingError(error);
+        // Fallback to original error handling and log classified result
+        const { errorPayload, shouldSaveToConversation } = createStreamingError(
+          error as unknown
+        ) as any;
+        console.error(
+          "[CHAT][STREAM][ERROR] classified:",
+          errorPayload,
+          "saveToConversation:",
+          shouldSaveToConversation
+        );
         return errorPayload.error.message;
       },
     });

@@ -12,7 +12,7 @@ export const QWEN_MODELS = [
     description: `Qwen's Best Coder model.\nOffers agentic tools capabilities for various coding tasks.`,
     apiKeyUsage: { allowUserKey: false, userKeyOnly: false },
     features: [TOOL_CALLING_FEATURE],
-    api_sdk: openrouter("qwen/qwen3-coder:nitro"),
+    api_sdk: openrouter("qwen/qwen3-coder"),
   },
   {
     id: "qwen/qwen3-235b-a22b-thinking-2507",
@@ -25,7 +25,7 @@ export const QWEN_MODELS = [
     description: `Qwen's Best Thinking model.\nOffers agentic tools capabilities for various thinking tasks.`,
     apiKeyUsage: { allowUserKey: false, userKeyOnly: false },
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE],
-    api_sdk: openrouter("qwen/qwen3-235b-a22b-thinking-2507:nitro"),
+    api_sdk: openrouter("qwen/qwen3-235b-a22b-thinking-2507"),
   },
   {
     id: "qwen/qwen3-235b-a22b-2507",
@@ -37,6 +37,6 @@ export const QWEN_MODELS = [
     description: `Qwen's Best 235B model.\nOffers agentic tools capabilities for various tasks.`,
     apiKeyUsage: { allowUserKey: false, userKeyOnly: false },
     features: [TOOL_CALLING_FEATURE],
-    api_sdk: openrouter("qwen/qwen3-235b-a22b-2507:nitro"),
+    api_sdk: openrouter("qwen/qwen3-235b-a22b-2507"),
   },
 ];

@@ -4,7 +4,48 @@
  * Supports both global corpus retrieval and user document retrieval with fusion
  */
 
+import { isDebugRagHttpEnabled, isDebugVerboseEnabled } from "@/lib/debug";
 import type { RAGContextResponse, RAGImage } from "./types";
+
+function truncateForLog(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  const omitted = text.length - maxChars;
+  return `${text.slice(0, maxChars)}\n…[truncated ${omitted} chars]`;
+}
+
+function redactHeadersForLog(
+  headers: Record<string, string>
+): Record<string, string> {
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey === "x-api-key" ||
+      lowerKey === "authorization" ||
+      lowerKey === "cookie" ||
+      lowerKey === "set-cookie"
+    ) {
+      redacted[key] = "<redacted>";
+      continue;
+    }
+    redacted[key] = value;
+  }
+  return redacted;
+}
+
+function safeResponseHeadersForLog(headers: Headers): Record<string, string> {
+  const output: Record<string, string> = {};
+  for (const [key, value] of headers.entries()) {
+    if (key.toLowerCase() === "set-cookie") {
+      output[key] = "<redacted>";
+      continue;
+    }
+    output[key] = value;
+  }
+  return output;
+}
 
 function decodeBase64ToUtf8(encoded: string): string {
   if (typeof Buffer !== "undefined") {
@@ -103,15 +144,55 @@ export async function fetchRAGContext(
           ...(options?.year ? { year: options.year } : {}),
         };
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(ragApiKey ? { "X-API-Key": ragApiKey } : {}),
+    };
+
+    const requestBodyJson = JSON.stringify(requestBody);
+    const debugHttp = isDebugRagHttpEnabled();
+    const debugVerbose = isDebugVerboseEnabled();
+    const maxLogChars = debugVerbose ? 200_000 : 8000;
+    const startedAt = Date.now();
+
+    if (debugHttp) {
+      console.log("[RAG][HTTP] Request:", {
+        url: endpoint,
+        method: "POST",
+        headers: redactHeadersForLog(headers),
+        body: truncateForLog(requestBodyJson, maxLogChars),
+        bodyLength: requestBodyJson.length,
+      });
+    }
+
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(ragApiKey ? { "X-API-Key": ragApiKey } : {}),
-      },
-      body: JSON.stringify(requestBody),
+      headers,
+      body: requestBodyJson,
       signal: controller.signal,
     });
+
+    const durationMs = Date.now() - startedAt;
+    let responseTextForDebug: string | null = null;
+    if (debugHttp) {
+      responseTextForDebug = await response
+        .clone()
+        .text()
+        .catch((err) => {
+          console.error("[RAG][HTTP] Failed to read response body:", err);
+          return "<failed to read response body>";
+        });
+
+      console.log("[RAG][HTTP] Response:", {
+        url: endpoint,
+        status: response.status,
+        ok: response.ok,
+        durationMs,
+        headers: safeResponseHeadersForLog(response.headers),
+        body: truncateForLog(responseTextForDebug, maxLogChars),
+        bodyLength: responseTextForDebug.length,
+      });
+    }
 
     clearTimeout(timeoutId);
     if (options?.signal) {
@@ -120,7 +201,9 @@ export async function fetchRAGContext(
 
     if (!response.ok) {
       console.error(`[RAG] Backend returned status ${response.status}`);
-      const errorText = await response.text().catch(() => "Unknown error");
+      const errorText =
+        responseTextForDebug ??
+        (await response.text().catch(() => "Unknown error"));
       console.error(`[RAG] Error: ${errorText}`);
       return null;
     }

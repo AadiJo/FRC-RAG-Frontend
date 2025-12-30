@@ -14,8 +14,7 @@ export function GET() {
 
   try {
     notice = readFileSync(join(root, "NOTICE"), "utf8");
-  } catch {
-  }
+  } catch {}
 
   const text = [license.trim(), "\n\n", notice.trim()].join("\n");
 

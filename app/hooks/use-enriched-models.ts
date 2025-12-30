@@ -50,28 +50,28 @@ export function useEnrichedModels() {
 
   const enrichedModels = useMemo(() => {
     return MODELS_OPTIONS.map((model): EnrichedModel => {
-      // Check if this model's provider has a user API key
-      // For OpenRouter models, check 'openrouter' key; for Groq models, check 'groq' key
-      const apiKeyProvider = model.provider === "groq" ? "groq" : "openrouter";
+      // Determine the API key provider for this model
+      // All models route through either 'groq' or 'openrouter' provider
+      const isGroqModel = model.provider === "groq";
+      const apiKeyProvider = isGroqModel ? "groq" : "openrouter";
       const userHasProviderKey = apiKeysMap.has(apiKeyProvider);
 
       // Check if model requires user key only
       const requiresKey = model.apiKeyUsage?.userKeyOnly ?? false;
 
       // Determine availability:
-      // 1. If user has no API keys at all, only FREE_TIER_MODELS are available
-      // 2. If user has an API key for this model's provider, model is available
-      // 3. If model requires user key only, user must have that provider's key
+      // 1. Free tier models (3 guest models) are always available - they use server credentials
+      // 2. All other models require the user to have the correct provider's API key
       let available: boolean;
-      if (!hasAnyApiKey) {
-        // No API keys - only free tier models available
-        available = FREE_TIER_MODELS_SET.has(model.id);
+      if (FREE_TIER_MODELS_SET.has(model.id)) {
+        // Free tier models are always available (use server credentials)
+        available = true;
       } else if (requiresKey) {
         // Model requires user key - check if they have the right provider key
         available = userHasProviderKey;
       } else {
-        // User has at least one API key and model doesn't require specific key
-        available = true;
+        // All non-free-tier models require the correct provider's API key
+        available = userHasProviderKey;
       }
 
       // Pre-compute features map for O(1) feature lookups

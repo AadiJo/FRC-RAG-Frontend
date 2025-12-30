@@ -8,7 +8,7 @@ import { openrouter } from "../openrouter";
 
 export const ZAI_MODELS = [
   {
-    id: "glm-4.5",
+    id: "z-ai/glm-4.5",
     name: "GLM 4.5",
     provider: "openrouter",
     displayProvider: "z-ai",
@@ -19,7 +19,7 @@ export const ZAI_MODELS = [
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE],
   },
   {
-    id: "glm-4.5-air",
+    id: "z-ai/glm-4.5-air",
     name: "GLM 4.5 Air",
     provider: "openrouter",
     displayProvider: "z-ai",
@@ -43,7 +43,7 @@ export const ZAI_MODELS = [
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE],
   },
   {
-    id: "glm-4.5v",
+    id: "z-ai/glm-4.5v",
     name: "GLM 4.5V",
     provider: "openrouter",
     displayProvider: "z-ai",
@@ -54,7 +54,7 @@ export const ZAI_MODELS = [
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE, FILE_UPLOAD_FEATURE],
   },
   {
-    id: "glm-4.6",
+    id: "z-ai/glm-4.6",
     name: "GLM 4.6",
     provider: "openrouter",
     displayProvider: "z-ai",
@@ -67,7 +67,7 @@ export const ZAI_MODELS = [
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE_DISABLED],
   },
   {
-    id: "glm-4.6-thinking",
+    id: "z-ai/glm-4.6:exacto",
     name: "GLM 4.6",
     subName: "Thinking",
     provider: "openrouter",
@@ -77,7 +77,7 @@ export const ZAI_MODELS = [
     description:
       "GLM 4.6 with reasoning capabilities enabled.\nOptimized for complex problem solving and deep chain-of-thought.",
     apiKeyUsage: { allowUserKey: false, userKeyOnly: false },
-    api_sdk: openrouter("z-ai/glm-4.6"),
+    api_sdk: openrouter("z-ai/glm-4.6:exacto"),
     features: [TOOL_CALLING_FEATURE, REASONING_FEATURE],
   },
 ];

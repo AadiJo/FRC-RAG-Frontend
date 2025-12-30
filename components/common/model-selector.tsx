@@ -3,10 +3,7 @@
 import {
   BrainIcon,
   CaretDownIcon,
-  EyeIcon,
   EyeSlashIcon,
-  FilePdfIcon,
-  KeyIcon,
   PushPinSimpleIcon,
 } from "@phosphor-icons/react";
 import { useCallback, useMemo, useState } from "react";
@@ -154,8 +151,6 @@ export function ModelSelector({
   const renderModelOption = useCallback(
     (modelOption: EnrichedModel) => {
       const providerOption = modelOption.providerInfo;
-      const hasFileUpload = modelOption.featuresMap["file-upload"];
-      const hasPdfProcessing = modelOption.featuresMap["pdf-processing"];
       const hasReasoning = modelOption.featuresMap.reasoning;
 
       const iconWrapperBaseClasses =
@@ -164,8 +159,6 @@ export function ModelSelector({
         "absolute inset-0 bg-current opacity-20 dark:opacity-25";
       const iconSizeClasses = "h-4 w-4";
 
-      const visionColorClasses = "text-teal-600 dark:text-teal-400";
-      const pdfColorClasses = "text-indigo-600 dark:text-indigo-400";
       const reasoningColorClasses = "text-pink-600 dark:text-pink-400";
 
       return (
@@ -191,61 +184,9 @@ export function ModelSelector({
               <span className="font-medium text-sm">
                 {getDisplayName(modelOption.name, modelOption.subName)}
               </span>
-              {modelOption.apiKeyUsage.userKeyOnly ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center">
-                      <KeyIcon className="size-3 text-muted-foreground" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>Requires API Key</p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasFileUpload ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(iconWrapperBaseClasses, visionColorClasses)}
-                  >
-                    <div className={iconOverlayClasses} />
-                    <EyeIcon
-                      className={cn(
-                        iconSizeClasses,
-                        "relative",
-                        visionColorClasses
-                      )}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>Supports Image Upload and Analysis</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
-            {hasPdfProcessing ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={cn(iconWrapperBaseClasses, pdfColorClasses)}>
-                    <div className={iconOverlayClasses} />
-                    <FilePdfIcon
-                      className={cn(
-                        iconSizeClasses,
-                        "relative",
-                        pdfColorClasses
-                      )}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>Supports PDF Upload and Analysis</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
             {hasReasoning ? (
               <Tooltip>
                 <TooltipTrigger asChild>

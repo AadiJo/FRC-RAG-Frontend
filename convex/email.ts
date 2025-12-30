@@ -150,7 +150,7 @@ export const sendTaskSummaryEmail = internalMutation({
 
       // Send email using Resend
       await resend.sendEmail(ctx, {
-                from: "FRC RAG <noreply@frcrag.johari-dev.com>",
+        from: "FRC RAG <noreply@frcrag.johari-dev.com>",
         to: [user.email],
         subject: `Task Complete: ${args.taskTitle}`,
         html: htmlContent,

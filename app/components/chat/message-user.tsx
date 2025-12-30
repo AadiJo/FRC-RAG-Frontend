@@ -164,7 +164,7 @@ const renderFilePart = (filePart: FileUIPart) => {
   }
 
   return null;
-}
+};
 
 export type MessageUserProps = {
   hasScrollAnchor?: boolean;

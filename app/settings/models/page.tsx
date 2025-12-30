@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  BrainIcon,
-  CheckIcon,
-  EyeIcon,
-  FilePdfIcon,
-  ImagesIcon,
-  KeyIcon,
-  LinkIcon,
-  SketchLogoIcon,
-  WrenchIcon,
-} from "@phosphor-icons/react";
+import { BrainIcon, CheckIcon, LinkIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ProviderIcon } from "@/app/components/common/provider-icon";
@@ -39,11 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   APP_BASE_URL,
   MODEL_DEFAULT,
   MODELS_OPTIONS,
@@ -58,41 +43,17 @@ type FeatureInfo = {
 };
 
 const FEATURE_INFO: Record<string, FeatureInfo> = {
-  "file-upload": {
-    label: "Vision",
-    icon: EyeIcon,
-  },
-  "pdf-processing": {
-    label: "PDF Comprehension",
-    icon: FilePdfIcon,
-  },
   reasoning: {
     label: "Reasoning",
     icon: BrainIcon,
-  },
-  "tool-calling": {
-    label: "Tool Calling",
-    icon: WrenchIcon,
-  },
-  "image-generation": {
-    label: "Image Generation",
-    icon: ImagesIcon,
   },
 };
 
 // Get the appropriate color classes for each feature
 const getFeatureColorClasses = (featureId: string) => {
   switch (featureId) {
-    case "file-upload":
-      return "text-teal-600 dark:text-teal-400";
-    case "pdf-processing":
-      return "text-indigo-600 dark:text-indigo-400";
     case "reasoning":
       return "text-sky-600 dark:text-sky-400";
-    case "tool-calling":
-      return "text-blue-600 dark:text-blue-400";
-    case "image-generation":
-      return "text-orange-600 dark:text-orange-400";
     default:
       return "text-muted-foreground";
   }
@@ -118,15 +79,10 @@ export default function ModelsPage() {
   }, [disabledModelsSet]);
 
   const allFeatures = useMemo(() => {
-    const f = new Set<string>();
-    for (const m of MODELS_OPTIONS) {
-      for (const feat of m.features) {
-        if (feat.enabled) {
-          f.add(feat.id);
-        }
-      }
-    }
-    return Array.from(f);
+    const hasAnyReasoning = MODELS_OPTIONS.some((m) =>
+      m.features.some((feat) => feat.id === "reasoning" && feat.enabled)
+    );
+    return hasAnyReasoning ? ["reasoning"] : [];
   }, []);
 
   const isCurrentlyEnabled = (id: string) => !disabled.has(id);
@@ -439,33 +395,6 @@ export default function ModelsPage() {
                         <h3 className="font-medium">
                           {getDisplayName(model.name, model.subName)}
                         </h3>
-                        {model.usesPremiumCredits ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center">
-                                <SketchLogoIcon
-                                  className="h-3 w-3 text-muted-foreground"
-                                  weight="regular"
-                                />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p>Premium Model</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : null}
-                        {model.apiKeyUsage.userKeyOnly ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center">
-                                <KeyIcon className="h-3 w-3 text-muted-foreground" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p>Requires API Key</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : null}
                       </div>
                       <Switch
                         checked={isCurrentlyEnabled(model.id)}

@@ -2,7 +2,6 @@ import { gateway } from "@ai-sdk/gateway";
 import {
   FILE_UPLOAD_FEATURE,
   PDF_PROCESSING_FEATURE,
-  REASONING_FEATURE,
   REASONING_FEATURE_BASIC,
   REASONING_FEATURE_DISABLED,
   TOOL_CALLING_FEATURE,
@@ -40,25 +39,6 @@ export const XAI_MODELS = [
       "Cost-efficient reasoning model from xAI.\nExcels at STEM tasks requiring less world knowledge.",
     api_sdk: gateway("xai/grok-3-mini"),
     features: [REASONING_FEATURE_BASIC, TOOL_CALLING_FEATURE],
-  },
-  {
-    id: "x-ai/grok-4.1-fast-thinking",
-    name: "Grok 4.1 Fast",
-    subName: "Thinking",
-    provider: "openrouter",
-    displayProvider: "xai",
-    premium: false,
-    usesPremiumCredits: false,
-    skipRateLimit: true,
-    description:
-      "Grok 4.1 Fast with reasoning capabilities enabled.\nxAI's best agentic model for deep research and complex tasks.",
-    api_sdk: openrouter("x-ai/grok-4.1-fast"),
-    features: [
-      FILE_UPLOAD_FEATURE,
-      PDF_PROCESSING_FEATURE,
-      REASONING_FEATURE,
-      TOOL_CALLING_FEATURE,
-    ],
   },
   {
     id: "x-ai/grok-4.1-fast",

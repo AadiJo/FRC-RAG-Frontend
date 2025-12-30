@@ -2,10 +2,13 @@ import { extractReasoningMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { ModelSchema } from "../schemas";
 import { DEEPSEEK_MODELS } from "./deepseek";
+import { GOOGLE_MODELS } from "./google";
 import { GROQ_MODELS } from "./groq";
 import { META_MODELS } from "./meta";
 import { MINIMAX_MODELS } from "./minimax";
 import { MOONSHOT_MODELS } from "./moonshot";
+import { OPENAI_MODELS } from "./openai";
+import { OPENROUTER_MODELS } from "./openrouter";
 import { QWEN_MODELS } from "./qwen";
 import { XAI_MODELS } from "./xai";
 import { ZAI_MODELS } from "./zai";
@@ -18,10 +21,13 @@ const reasoningMiddleware = extractReasoningMiddleware({
 // Groq models use direct SDK, others use OpenRouter
 export const MODELS_DATA = [
   ...GROQ_MODELS,
+  ...OPENAI_MODELS,
+  ...OPENROUTER_MODELS,
   ...XAI_MODELS,
   ...META_MODELS,
   ...DEEPSEEK_MODELS,
   ...MOONSHOT_MODELS,
+  ...GOOGLE_MODELS,
   ...ZAI_MODELS,
   ...MINIMAX_MODELS,
   ...QWEN_MODELS,
