@@ -327,17 +327,32 @@ async function extractTextFromPDF(
       if (!globalThis.DOMMatrix) {
         let canvasModule: any = undefined;
         try {
-          // Use createRequire to load CommonJS packages from ESM code.
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { createRequire } = await import("module");
-          const require = createRequire(import.meta.url);
+          // Try to require the native module at runtime without letting Turbopack
+          // statically analyze or bundle it. Using eval('require') prevents the
+          // bundler from resolving the import during build.
           try {
-            canvasModule = require("@napi-rs/canvas");
+            // eslint-disable-next-line no-eval
+            const req = eval("typeof require !== 'undefined' ? require : undefined");
+            if (req) {
+              const pkg = ["@napi-rs", "/canvas"].join("");
+              canvasModule = req(pkg);
+            } else {
+              // Fallback: try createRequire at runtime if available
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const { createRequire } = await import("module");
+              const r = createRequire(import.meta.url);
+              try {
+                const pkg = ["@napi-rs", "/canvas"].join("");
+                canvasModule = r(pkg);
+              } catch (e) {
+                // optional dependency not installed
+              }
+            }
           } catch (e) {
-            // optional dependency not installed
+            // require/import not available or module not installed
           }
         } catch (e) {
-          // ignore createRequire failures
+          // ignore unexpected errors
         }
 
         if (canvasModule?.DOMMatrix) {
