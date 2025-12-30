@@ -1,10 +1,9 @@
 "use client";
 
-import { ArrowLeft, Moon, SignOut, Sun } from "@phosphor-icons/react";
+import { ArrowLeft, SignOut } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/providers/user-provider";
-import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 
@@ -19,7 +18,6 @@ export function HeaderGoBack({
   showControls = true,
   showThemeToggle = true,
 }: HeaderGoBackProps) {
-  const { theme, setTheme } = useTheme();
   const { signOut } = useUser();
   const router = useRouter();
 
@@ -48,28 +46,7 @@ export function HeaderGoBack({
       </Link>
       {showControls ? (
         <div className="flex items-center gap-2">
-          {showThemeToggle ? (
-            <button
-              aria-label="Switch theme"
-              className="group flex items-center justify-center rounded-full p-2 outline-none hover:bg-accent focus-visible:rounded-full focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              tabIndex={0}
-              type="button"
-            >
-              {theme === "dark" ? (
-                <Sun
-                  className="size-5 text-muted-foreground transition-colors group-hover:text-foreground"
-                  weight="bold"
-                />
-              ) : (
-                <Moon
-                  className="size-5 text-muted-foreground transition-colors group-hover:text-foreground"
-                  weight="bold"
-                />
-              )}
-              <span className="sr-only">Toggle theme</span>
-            </button>
-          ) : null}
+          {/* Theme is forced to dark only; toggle removed intentionally. */}
           <Button
             className="flex items-center gap-1 px-2"
             onClick={handleSignOut}

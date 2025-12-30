@@ -121,10 +121,11 @@ export const defaultDarkThemeStyles = {
 // Default theme state
 export const defaultThemeState: ThemeEditorState = {
   styles: {
-    light: defaultLightThemeStyles,
+    // Make light identical to dark so there is no visual light mode
+    light: defaultDarkThemeStyles,
     dark: defaultDarkThemeStyles,
   },
-  currentMode: "light", // Always default to light for SSR compatibility
+  currentMode: "dark", // Force dark mode as default
   preset: "frcrag",
   hslAdjustments: {
     hueShift: 0,

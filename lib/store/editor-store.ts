@@ -37,7 +37,7 @@ type EditorStore = {
 // Helper function to safely detect system preference on client-side only
 const getSystemPreference = (): "light" | "dark" => {
   if (typeof window === "undefined") {
-    return "light"; // Safe server-side default
+    return "dark"; // Force dark as safe server-side default
   }
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"

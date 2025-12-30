@@ -78,11 +78,10 @@ const buildActiveFontValue = (
 
 // Helper functions (not exported, used internally by applyThemeToElement)
 const updateThemeClass = (root: HTMLElement, mode: Theme) => {
-  if (mode === "light") {
-    root.classList.remove("dark");
-  } else {
-    root.classList.add("dark");
-  }
+  // Always ensure the dark class is present so the UI is visually dark-only.
+  // We intentionally don't remove the class to avoid Tailwind 'dark' variant
+  // falling back to a light stylesheet.
+  root.classList.add("dark");
 };
 
 const applyStyleToElement = (
