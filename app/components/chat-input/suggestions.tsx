@@ -63,7 +63,7 @@ export const Suggestions = memo(function SuggestionsComponent({
     () => (
       <motion.div
         animate="animate"
-        className="flex w-full max-w-full flex-nowrap justify-start gap-2 overflow-x-auto px-2 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
+        className="flex w-full max-w-full flex-nowrap justify-center gap-2 overflow-x-auto px-2 md:mx-auto md:max-w-2xl md:flex-wrap md:justify-center md:pl-0"
         exit="exit"
         initial="initial"
         key="suggestions-grid"
