@@ -30,6 +30,7 @@
     "@convex-dev/react-query": "^0.1.0",
     "@convex-dev/resend": "^0.2.2",
     "@lobehub/icons": "^2.48.0",
+    "@napi-rs/canvas": "^0.1.88",
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-alert-dialog": "^1.1.15",

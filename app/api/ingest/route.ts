@@ -320,6 +320,39 @@ async function extractTextFromPDF(
   pdfData: Uint8Array
 ): Promise<{ text: string; pageCount: number }> {
   try {
+    // In Node.js environments pdfjs may rely on DOM classes (DOMMatrix, ImageData, Path2D).
+    // Try to polyfill those from the optional `@napi-rs/canvas` package so server
+    // side text extraction works without a browser-like DOM.
+    try {
+      if (!globalThis.DOMMatrix) {
+        let canvasModule: any = undefined;
+        try {
+          // Use createRequire to load CommonJS packages from ESM code.
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { createRequire } = await import("module");
+          const require = createRequire(import.meta.url);
+          try {
+            canvasModule = require("@napi-rs/canvas");
+          } catch (e) {
+            // optional dependency not installed
+          }
+        } catch (e) {
+          // ignore createRequire failures
+        }
+
+        if (canvasModule?.DOMMatrix) {
+          (globalThis as any).DOMMatrix = canvasModule.DOMMatrix;
+          if (canvasModule.ImageData) (globalThis as any).ImageData = canvasModule.ImageData;
+          if (canvasModule.Path2D) (globalThis as any).Path2D = canvasModule.Path2D;
+        } else {
+          console.warn(
+            "[Ingest] DOMMatrix polyfill not available. Install @napi-rs/canvas on the server to enable PDF rendering in Node.js."
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("[Ingest] DOMMatrix polyfill attempt failed:", e);
+    }
     // Use pdfjs-dist directly in a Node-friendly way to avoid worker bundling issues
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
@@ -362,9 +395,12 @@ async function extractTextFromPDF(
     return { text: text.trim(), pageCount: numPages };
   } catch (err) {
     console.error("[Ingest] PDF extraction error:", err);
-    throw new Error(
-      `Failed to extract text from PDF: ${err instanceof Error ? err.message : "Unknown error"}`
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    // If DOMMatrix caused the failure, include an actionable hint.
+    const hint = msg.includes("DOMMatrix")
+      ? " (server is missing a DOMMatrix polyfill — install @napi-rs/canvas)"
+      : "";
+    throw new Error(`Failed to extract text from PDF: ${msg}${hint}`);
   }
 }
 
