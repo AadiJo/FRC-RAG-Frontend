@@ -98,11 +98,11 @@ Do not use outdated information or make assumptions about the current date and t
 const INLINE_IMAGE_PLACEHOLDER_RULES = `
 <inline_image_placeholders>
 If you include image placeholders in your answer (e.g., [img:some_id]):
-- NEVER put [img:...] placeholders inside Markdown tables.
 - NEVER wrap [img:...] placeholders in backticks or code blocks.
 - NEVER use Markdown image syntax like ![...](...) or a leading '!'.
 - Put each [img:...] placeholder on its own line, as plain text.
 - If you need tabular structure, put the table first and then list the images below the table.
+- If you recieve an image placeholder, make sure to use it in your response where appropriate.
 </inline_image_placeholders>`.trim();
 
 export const FORMATTING_RULES = String.raw`

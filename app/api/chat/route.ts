@@ -1225,19 +1225,53 @@ export async function POST(req: Request) {
 
     // Add RAG images to response headers if available
     if (ragContext) {
-      const encodedImageMap = encodeRAGImagesForHeader(ragContext);
-      if (encodedImageMap) {
-        response.headers.set("X-RAG-Images", encodedImageMap);
-      }
+      // NOTE: RAG image data can easily exceed common header limits (and can
+      // throw during header serialization). Never allow these headers to break
+      // the chat stream.
+      const MAX_RAG_HEADER_CHARS = 6000;
 
-      const encodedRelatedImages = encodeRelatedImagesForHeader(ragContext);
-      if (encodedRelatedImages) {
-        response.headers.set("X-RAG-Related-Images", encodedRelatedImages);
-      }
+      let headerImagesSkipped = Boolean(ragContext.images_skipped);
 
-      if (ragContext.images_skipped) {
-        // Frontend expects a numeric value.
-        response.headers.set("X-RAG-Images-Skipped", "1");
+      try {
+        const encodedImageMap = encodeRAGImagesForHeader(ragContext, {
+          maxChars: MAX_RAG_HEADER_CHARS,
+        });
+        if (encodedImageMap) {
+          response.headers.set("X-RAG-Images", encodedImageMap);
+        } else if (ragContext.image_map && Object.keys(ragContext.image_map).length > 0) {
+          headerImagesSkipped = true;
+        }
+
+        const encodedRelatedImages = encodeRelatedImagesForHeader(ragContext, {
+          maxChars: MAX_RAG_HEADER_CHARS,
+        });
+        if (encodedRelatedImages) {
+          response.headers.set("X-RAG-Related-Images", encodedRelatedImages);
+        } else if (ragContext.images && ragContext.images.length > 0) {
+          headerImagesSkipped = true;
+        }
+
+        if (headerImagesSkipped) {
+          // Frontend expects a numeric value.
+          response.headers.set("X-RAG-Images-Skipped", "1");
+        }
+      } catch (headerError) {
+        // Do not fail the stream if headers are too large/invalid.
+        try {
+          response.headers.delete("X-RAG-Images");
+          response.headers.delete("X-RAG-Related-Images");
+          response.headers.set("X-RAG-Images-Skipped", "1");
+        } catch {
+          // swallow
+        }
+
+        try {
+          console.error("[RAG] Failed to set RAG image headers", {
+            error: serializeUnknownErrorForLog(headerError),
+          });
+        } catch {
+          // swallow
+        }
       }
     }
 

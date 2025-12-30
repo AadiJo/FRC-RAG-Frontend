@@ -273,7 +273,11 @@ export async function fetchRAGContext(
  * @returns Base64-encoded JSON string of image map
  */
 export function encodeRAGImagesForHeader(
-  ragContext: RAGContextResponse | null
+  ragContext: RAGContextResponse | null,
+  options?: {
+    /** Maximum number of characters allowed in the encoded header value. */
+    maxChars?: number;
+  }
 ): string | null {
   if (
     !ragContext?.image_map ||
@@ -284,7 +288,12 @@ export function encodeRAGImagesForHeader(
 
   try {
     const json = JSON.stringify(ragContext.image_map);
-    return Buffer.from(json).toString("base64");
+    const encoded = Buffer.from(json).toString("base64");
+    const maxChars = options?.maxChars;
+    if (typeof maxChars === "number" && maxChars > 0 && encoded.length > maxChars) {
+      return null;
+    }
+    return encoded;
   } catch {
     return null;
   }
@@ -296,7 +305,11 @@ export function encodeRAGImagesForHeader(
  * @returns Base64-encoded JSON string of related images
  */
 export function encodeRelatedImagesForHeader(
-  ragContext: RAGContextResponse | null
+  ragContext: RAGContextResponse | null,
+  options?: {
+    /** Maximum number of characters allowed in the encoded header value. */
+    maxChars?: number;
+  }
 ): string | null {
   if (!ragContext?.images || ragContext.images.length === 0) {
     return null;
@@ -304,7 +317,12 @@ export function encodeRelatedImagesForHeader(
 
   try {
     const json = JSON.stringify(ragContext.images);
-    return Buffer.from(json).toString("base64");
+    const encoded = Buffer.from(json).toString("base64");
+    const maxChars = options?.maxChars;
+    if (typeof maxChars === "number" && maxChars > 0 && encoded.length > maxChars) {
+      return null;
+    }
+    return encoded;
   } catch {
     return null;
   }
