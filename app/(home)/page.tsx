@@ -583,7 +583,7 @@ export default function Home() {
                 </summary>
                 <div className="mt-2 ml-6 text-white/80 text-xs sm:text-base">
                   FRC RAG supports multiple AI models through OpenRouter,
-                  including GPT-4, Claude, Gemini, and more. You can select your
+                  from OpenAI, Google, xAI, and more. You can select your
                   preferred model in the chat settings.
                 </div>
               </details>
@@ -629,7 +629,7 @@ export default function Home() {
             —{" "}
             <a
               className="underline hover:text-blue-400"
-              href="/privacy-policy"
+              href="https://frcrag.johari-dev.com/privacy-policy"
             >
               Privacy Policy
             </a>
