@@ -269,7 +269,9 @@ export function UserDocumentsManager() {
         (result as { success: unknown }).success === true;
 
       // indexing result: notifications removed; log errors via sonner for failures
-      if (!isSuccess) {
+      if (isSuccess) {
+        sonnerToast.success("Document indexed successfully");
+      } else {
         const message =
           typeof (result as { error?: { message?: unknown } }).error
             ?.message === "string"

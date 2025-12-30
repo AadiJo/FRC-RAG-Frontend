@@ -420,12 +420,14 @@ export const deleteUserDocument = mutation({
       return { success: false };
     }
 
-    // Mark as deleted (actual vector deletion happens via API call)
-    await ctx.db.patch(documentId, {
-      status: "deleted",
-    });
+    // Store docId before deletion for backend cleanup
+    const { docId } = document;
 
-    return { success: true, docId: document.docId };
+    // Actually delete the document from the database
+    // The API route handles backend vector deletion before calling this mutation
+    await ctx.db.delete(documentId);
+
+    return { success: true, docId };
   },
 });
 

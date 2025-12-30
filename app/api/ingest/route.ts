@@ -17,10 +17,29 @@ import type {
 // Maximum PDF size (10 MB)
 const MAX_PDF_SIZE = 10 * 1024 * 1024;
 
+// Timeout configuration (in milliseconds)
+const DRIVE_DOWNLOAD_TIMEOUT = 30_000; // 30 seconds for downloading from Drive
+const BACKEND_UPSERT_TIMEOUT = 60_000; // 60 seconds for backend indexing
+
 // Backend configuration
 const RAG_BACKEND_URL =
   process.env.NEXT_PUBLIC_RAG_BACKEND_URL ?? process.env.RAG_BACKEND_URL ?? "";
 const RAG_API_KEY = process.env.RAG_API_KEY ?? "";
+
+/**
+ * Create an AbortController with timeout
+ */
+function createTimeoutController(timeoutMs: number): {
+  controller: AbortController;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    controller,
+    cleanup: () => clearTimeout(timeoutId),
+  };
+}
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -143,16 +162,52 @@ export async function POST(req: Request): Promise<Response> {
     );
 
     try {
-      // Download PDF from Google Drive
+      // Download PDF from Google Drive with timeout
       // Downloading PDF from Drive (logging removed)
-      const driveResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
+      const driveTimeout = createTimeoutController(DRIVE_DOWNLOAD_TIMEOUT);
+      let driveResponse: Response;
+      try {
+        driveResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: driveTimeout.controller.signal,
+          }
+        );
+      } catch (fetchErr) {
+        driveTimeout.cleanup();
+        const isTimeout =
+          fetchErr instanceof Error && fetchErr.name === "AbortError";
+
+        await fetchMutation(
+          api.user_documents.updateDocumentStatus,
+          {
+            documentId,
+            status: "failed",
+            errorCode: isTimeout ? "DRIVE_DOWNLOAD_TIMEOUT" : "DRIVE_DOWNLOAD_FAILED",
+            errorMessage: isTimeout
+              ? "Download from Google Drive timed out"
+              : "Failed to download from Google Drive",
           },
-        }
-      );
+          { token }
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: isTimeout ? "DRIVE_DOWNLOAD_TIMEOUT" : "DRIVE_DOWNLOAD_FAILED",
+              message: isTimeout
+                ? "Download from Google Drive timed out. Please try again."
+                : "Failed to download file from Google Drive",
+            },
+          },
+          { status: isTimeout ? 504 : 502 }
+        );
+      }
+      driveTimeout.cleanup();
 
       // drive response status logging removed
 
@@ -469,17 +524,35 @@ async function sendToBackend(
   };
 
   try {
-    const response = await fetch(
-      `${RAG_BACKEND_URL}/api/v1/user-documents/upsert`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(RAG_API_KEY ? { "X-API-Key": RAG_API_KEY } : {}),
-        },
-        body: JSON.stringify(request),
-      }
-    );
+    // Create timeout controller for backend request
+    const backendTimeout = createTimeoutController(BACKEND_UPSERT_TIMEOUT);
+    let response: Response;
+    try {
+      response = await fetch(
+        `${RAG_BACKEND_URL}/api/v1/user-documents/upsert`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(RAG_API_KEY ? { "X-API-Key": RAG_API_KEY } : {}),
+          },
+          body: JSON.stringify(request),
+          signal: backendTimeout.controller.signal,
+        }
+      );
+    } catch (fetchErr) {
+      backendTimeout.cleanup();
+      const isTimeout =
+        fetchErr instanceof Error && fetchErr.name === "AbortError";
+      console.error("[Ingest] Backend request error:", fetchErr);
+      return {
+        success: false,
+        error: isTimeout
+          ? "Backend indexing timed out. Please try again."
+          : (fetchErr instanceof Error ? fetchErr.message : "Network error"),
+      };
+    }
+    backendTimeout.cleanup();
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error");
