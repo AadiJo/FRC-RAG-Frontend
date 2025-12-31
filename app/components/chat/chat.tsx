@@ -65,6 +65,10 @@ import {
   isUserAuthenticated,
 } from "@/lib/user-utils";
 import { cn } from "@/lib/utils";
+import {
+  hasCompletedOnboarding,
+  OnboardingModal,
+} from "@/app/components/onboarding/onboarding-modal";
 import frcPrompts from "./frc-prompts.json";
 
 const DRAFT_STORE_KEY = "draft-chat";
@@ -206,6 +210,11 @@ function ChatContent() {
     >
   >({});
 
+  // Onboarding modal state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+
+
   const activeRequestAbortControllerRef = useRef<AbortController | null>(null);
 
   // Custom fetch that extracts RAG headers
@@ -274,16 +283,16 @@ function ChatContent() {
           // Strip [img:...] wrapper if present since the text parser extracts bare IDs.
           const imageMap: RAGImage[] = rawImageMap
             ? Object.entries(rawImageMap).map(([key, image]) => {
-                // Strip [img:...] wrapper from key if present
-                const bareId =
-                  key.startsWith("[img:") && key.endsWith("]")
-                    ? key.slice(5, -1)
-                    : key;
-                return {
-                  ...image,
-                  image_id: bareId,
-                };
-              })
+              // Strip [img:...] wrapper from key if present
+              const bareId =
+                key.startsWith("[img:") && key.endsWith("]")
+                  ? key.slice(5, -1)
+                  : key;
+              return {
+                ...image,
+                image_id: bareId,
+              };
+            })
             : [];
           const relatedImages: RAGImage[] = rawRelatedImages ?? [];
 
@@ -362,16 +371,16 @@ function ChatContent() {
         // Strip [img:...] wrapper if present since the text parser extracts bare IDs.
         const imageMap: RAGImage[] = rawImageMap
           ? Object.entries(rawImageMap).map(([key, image]) => {
-              // Strip [img:...] wrapper from key if present
-              const bareId =
-                key.startsWith("[img:") && key.endsWith("]")
-                  ? key.slice(5, -1)
-                  : key;
-              return {
-                ...image,
-                image_id: bareId,
-              };
-            })
+            // Strip [img:...] wrapper from key if present
+            const bareId =
+              key.startsWith("[img:") && key.endsWith("]")
+                ? key.slice(5, -1)
+                : key;
+            return {
+              ...image,
+              image_id: bareId,
+            };
+          })
           : [];
         const relatedImages: RAGImage[] = rawRelatedImages ?? [];
 
@@ -423,6 +432,23 @@ function ChatContent() {
 
   const personaId = currentChat?.personaId ?? tempPersonaId;
   const isAuthenticated = isUserAuthenticated(user);
+
+  // Check if onboarding should be shown on mount
+  useEffect(() => {
+    // Wait for user auth state to load
+    if (isUserLoading) return;
+
+    // Only show onboarding for authenticated users
+    if (!isAuthenticated) return;
+
+    // Delay check slightly to ensure localStorage is available and avoid SSR issues
+    const timer = setTimeout(() => {
+      if (!hasCompletedOnboarding()) {
+        setShowOnboarding(true);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [isUserLoading, isAuthenticated]);
 
   // Enhanced useChat hook with AI SDK best practices
   const { regenerate, setMessages, sendMessage } = useChat({
@@ -1355,154 +1381,161 @@ function ChatContent() {
   }
 
   return (
-    <div
-      className={cn(
-        "@container/main relative flex h-full flex-col items-center",
-        hasMessages ? "justify-end" : "justify-center"
-      )}
-      style={
-        { "--chat-input-height": `${composerHeight}px` } as React.CSSProperties
-      }
-    >
-      <DialogAuth open={hasDialogAuth} setOpenAction={setHasDialogAuth} />
-
-      <AnimatePresence initial={false} mode="popLayout">
-        {!chatId && messages.length === 0 ? (
-          <motion.div
-            animate={{ opacity: 1 }}
-            className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-4 pt-20"
-            exit={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            key="onboarding"
-            layout="position"
-            layoutId="onboarding"
-            transition={{ layout: { duration: 0 } }}
-          >
-            <h1 className="mb-6 font-medium text-3xl tracking-tight">
-              {onboardingPrompt}
-            </h1>
-            <div className="w-full">
-              <ChatInput
-                files={files}
-                hasAnyApiKey={hasAnyApiKey}
-                hasSuggestions={!chatId && messages.length === 0}
-                isReasoningModel={supportsReasoningEffort(selectedModel)}
-                isUserAuthenticated={isAuthenticated}
-                onFileRemoveAction={removeFile}
-                onFileUploadAction={addFiles}
-                onSelectModelAction={handleModelChange}
-                onSelectReasoningEffortAction={setReasoningEffort}
-                onSelectSystemPromptAction={(id: string) =>
-                  setTempPersonaId(id)
-                }
-                onSendAction={(
-                  message: string,
-                  { enableSearch }: { enableSearch: boolean }
-                ) => submit(message, { body: { enableSearch } })}
-                onStopAction={stopAndMarkMessage}
-                onSuggestionAction={(suggestion: string) =>
-                  sendMessage({ text: suggestion })
-                }
-                reasoningEffort={reasoningEffort}
-                selectedModel={selectedModel}
-                selectedPersonaId={personaId}
-              />
-            </div>
-          </motion.div>
-        ) : (
-          <>
-            <Conversation
-              autoScroll={!targetMessageId}
-              containerRef={conversationContainerRef}
-              hasAnyApiKey={hasAnyApiKey}
-              isReasoningModel={supportsReasoningEffort(selectedModel)}
-              isUserAuthenticated={isAuthenticated}
-              key="conversation"
-              onBranch={(messageId) => {
-                if (!chatId) {
-                  return;
-                }
-                handleBranch(chatId, messageId, user);
-              }}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-              onReload={handleReload}
-              ragImagesByMessage={ragImagesByMessage}
-              reasoningEffort={reasoningEffort}
-              scrollToRef={conversationBottomRef}
-              selectedModel={selectedModel}
-            />
-            {/* Guaranteed visible bottom padding for related images, not inside scrollable area */}
-            <div
-              aria-hidden="true"
-              style={{ height: "164px", width: "100%" }}
-            />
-          </>
+    <>
+      <div
+        className={cn(
+          "@container/main relative flex h-full flex-col items-center",
+          hasMessages ? "justify-end" : "justify-center"
         )}
-      </AnimatePresence>
+        style={
+          { "--chat-input-height": `${composerHeight}px` } as React.CSSProperties
+        }
+      >
+        <DialogAuth open={hasDialogAuth} setOpenAction={setHasDialogAuth} />
 
-      {/* Input Area - Fixed at bottom only when there are messages */}
-      {hasMessages ? (
-        <div
-          className={cn(
-            "fixed right-0 bottom-0 left-0 z-40 px-4 pt-4 pb-4 transition-[left] duration-300 ease-out",
-            isSidebarOpen ? "md:left-72" : "md:left-0"
-          )}
-          ref={composerRef}
-        >
-          <motion.div
-            className={cn("mx-auto flex w-full max-w-3xl flex-col gap-2")}
-            layout="position"
-            layoutId="chat-input-container"
-            transition={{
-              layout: {
-                ...TRANSITION_LAYOUT,
-                duration: messages.length === 1 ? 0.2 : 0,
-              },
-            }}
-          >
-            <div className="flex w-full justify-end px-2">
-              <ScrollButton
-                anchorRef={conversationBottomRef}
-                aria-label="Scroll to bottom"
-                className="border border-white/10 bg-white/5 text-white/80 shadow-lg backdrop-blur-xl hover:bg-white/[0.07] hover:text-white"
+        <AnimatePresence initial={false} mode="popLayout">
+          {!chatId && messages.length === 0 ? (
+            <motion.div
+              animate={{ opacity: 1 }}
+              className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-4 pt-20"
+              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              key="onboarding"
+              layout="position"
+              layoutId="onboarding"
+              transition={{ layout: { duration: 0 } }}
+            >
+              <h1 className="mb-6 text-center font-medium text-3xl tracking-tight">
+                {onboardingPrompt}
+              </h1>
+              <div className="w-full">
+                <ChatInput
+                  files={files}
+                  hasAnyApiKey={hasAnyApiKey}
+                  hasSuggestions={!chatId && messages.length === 0}
+                  isReasoningModel={supportsReasoningEffort(selectedModel)}
+                  isUserAuthenticated={isAuthenticated}
+                  onFileRemoveAction={removeFile}
+                  onFileUploadAction={addFiles}
+                  onSelectModelAction={handleModelChange}
+                  onSelectReasoningEffortAction={setReasoningEffort}
+                  onSelectSystemPromptAction={(id: string) =>
+                    setTempPersonaId(id)
+                  }
+                  onSendAction={(
+                    message: string,
+                    { enableSearch }: { enableSearch: boolean }
+                  ) => submit(message, { body: { enableSearch } })}
+                  onStopAction={stopAndMarkMessage}
+                  onSuggestionAction={(suggestion: string) =>
+                    sendMessage({ text: suggestion })
+                  }
+                  reasoningEffort={reasoningEffort}
+                  selectedModel={selectedModel}
+                  selectedPersonaId={personaId}
+                />
+              </div>
+            </motion.div>
+          ) : (
+            <>
+              <Conversation
+                autoScroll={!targetMessageId}
                 containerRef={conversationContainerRef}
-                size="icon"
-                type="button"
-                variant="ghost"
-              />
-            </div>
-            <div className="w-full min-w-0">
-              <ChatInput
-                files={files}
                 hasAnyApiKey={hasAnyApiKey}
-                hasSuggestions={false}
                 isReasoningModel={supportsReasoningEffort(selectedModel)}
                 isUserAuthenticated={isAuthenticated}
-                onFileRemoveAction={removeFile}
-                onFileUploadAction={addFiles}
-                onSelectModelAction={handleModelChange}
-                onSelectReasoningEffortAction={setReasoningEffort}
-                onSelectSystemPromptAction={(id: string) =>
-                  setTempPersonaId(id)
-                }
-                onSendAction={(
-                  message: string,
-                  { enableSearch }: { enableSearch: boolean }
-                ) => submit(message, { body: { enableSearch } })}
-                onStopAction={stopAndMarkMessage}
-                onSuggestionAction={(suggestion: string) =>
-                  sendMessage({ text: suggestion })
-                }
+                key="conversation"
+                onBranch={(messageId) => {
+                  if (!chatId) {
+                    return;
+                  }
+                  handleBranch(chatId, messageId, user);
+                }}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                onReload={handleReload}
+                ragImagesByMessage={ragImagesByMessage}
                 reasoningEffort={reasoningEffort}
+                scrollToRef={conversationBottomRef}
                 selectedModel={selectedModel}
-                selectedPersonaId={personaId}
               />
-            </div>
-          </motion.div>
-        </div>
-      ) : null}
-    </div>
+              {/* Guaranteed visible bottom padding for related images, not inside scrollable area */}
+              <div
+                aria-hidden="true"
+                style={{ height: "164px", width: "100%" }}
+              />
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Input Area - Fixed at bottom only when there are messages */}
+        {hasMessages ? (
+          <div
+            className={cn(
+              "fixed right-0 bottom-0 left-0 z-40 px-4 pt-4 pb-4 transition-[left] duration-300 ease-out",
+              isSidebarOpen ? "md:left-72" : "md:left-0"
+            )}
+            ref={composerRef}
+          >
+            <motion.div
+              className={cn("mx-auto flex w-full max-w-3xl flex-col gap-2")}
+              layout="position"
+              layoutId="chat-input-container"
+              transition={{
+                layout: {
+                  ...TRANSITION_LAYOUT,
+                  duration: messages.length === 1 ? 0.2 : 0,
+                },
+              }}
+            >
+              <div className="flex w-full justify-end px-2">
+                <ScrollButton
+                  anchorRef={conversationBottomRef}
+                  aria-label="Scroll to bottom"
+                  className="border border-white/10 bg-white/5 text-white/80 shadow-lg backdrop-blur-xl hover:bg-white/[0.07] hover:text-white"
+                  containerRef={conversationContainerRef}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                />
+              </div>
+              <div className="w-full min-w-0">
+                <ChatInput
+                  files={files}
+                  hasAnyApiKey={hasAnyApiKey}
+                  hasSuggestions={false}
+                  isReasoningModel={supportsReasoningEffort(selectedModel)}
+                  isUserAuthenticated={isAuthenticated}
+                  onFileRemoveAction={removeFile}
+                  onFileUploadAction={addFiles}
+                  onSelectModelAction={handleModelChange}
+                  onSelectReasoningEffortAction={setReasoningEffort}
+                  onSelectSystemPromptAction={(id: string) =>
+                    setTempPersonaId(id)
+                  }
+                  onSendAction={(
+                    message: string,
+                    { enableSearch }: { enableSearch: boolean }
+                  ) => submit(message, { body: { enableSearch } })}
+                  onStopAction={stopAndMarkMessage}
+                  onSuggestionAction={(suggestion: string) =>
+                    sendMessage({ text: suggestion })
+                  }
+                  reasoningEffort={reasoningEffort}
+                  selectedModel={selectedModel}
+                  selectedPersonaId={personaId}
+                />
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <OnboardingModal onComplete={() => setShowOnboarding(false)} />
+      )}
+    </>
   );
 }
 

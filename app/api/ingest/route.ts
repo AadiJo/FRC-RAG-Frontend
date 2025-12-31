@@ -19,7 +19,11 @@ const MAX_PDF_SIZE = 10 * 1024 * 1024;
 
 // Timeout configuration (in milliseconds)
 const DRIVE_DOWNLOAD_TIMEOUT = 30_000; // 30 seconds for downloading from Drive
-const BACKEND_UPSERT_TIMEOUT = 60_000; // 60 seconds for backend indexing
+// Backend upsert timeout (ms). Can be configured via `RAG_UPSERT_TIMEOUT_MS`.
+// Default to 180_000 (180 seconds) to allow larger documents to finish indexing.
+const BACKEND_UPSERT_TIMEOUT = Number(
+  process.env.RAG_UPSERT_TIMEOUT_MS ?? "180000"
+);
 
 // Backend configuration
 const RAG_BACKEND_URL =

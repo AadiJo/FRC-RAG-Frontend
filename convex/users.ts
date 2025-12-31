@@ -272,8 +272,10 @@ export const incrementMessageCount = mutation({
       const dailyLimitName = isAnonymous
         ? "anonymousDaily"
         : "authenticatedDaily";
+
+      const today = new Date().toISOString().split("T")[0];
       await rateLimiter.limit(ctx, dailyLimitName, {
-        key: userId,
+        key: `${userId}-${today}`,
         throws: true,
       });
     }
@@ -306,8 +308,10 @@ export const assertNotOverLimit = mutation({
       const dailyLimitName = isAnonymous
         ? "anonymousDaily"
         : "authenticatedDaily";
+
+      const today = new Date().toISOString().split("T")[0];
       const dailyStatus = await rateLimiter.check(ctx, dailyLimitName, {
-        key: userId,
+        key: `${userId}-${today}`,
       });
 
       if (!dailyStatus.ok) {
@@ -366,9 +370,10 @@ export const getRateLimitStatus = query({
       ? "anonymousDaily"
       : "authenticatedDaily";
 
+    const today = new Date().toISOString().split("T")[0];
     const [dailyStatus, dailyConfig] = await Promise.all([
-      rateLimiter.check(ctx, dailyLimitName, { key: userId }),
-      rateLimiter.getValue(ctx, dailyLimitName, { key: userId }),
+      rateLimiter.check(ctx, dailyLimitName, { key: `${userId}-${today}` }),
+      rateLimiter.getValue(ctx, dailyLimitName, { key: `${userId}-${today}` }),
     ]);
 
     // Process daily limits
@@ -384,9 +389,12 @@ export const getRateLimitStatus = query({
       dailyCount = dailyLimit - (dailyStatus.ok ? dailyConfig.value : 0);
       dailyRemaining = dailyStatus.ok ? dailyConfig.value : 0;
 
-      // Our local `rateLimiter.getValue()` can return a minimal config
-      // containing only `period` (see `convex/rateLimiter.ts`).
-      dailyReset = dailyConfig.ts + dailyConfig.config.period;
+      // Calculate next midnight UTC for reset
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setUTCDate(now.getUTCDate() + 1);
+      tomorrow.setUTCHours(0, 0, 0, 0);
+      dailyReset = tomorrow.getTime();
     }
 
     // Monthly limits removed
@@ -497,7 +505,8 @@ export const { getRateLimit: getRateLimitHook, getServerTime } =
     key: async (ctx) => {
       type AuthContext = Parameters<typeof getAuthUserId>[0];
       const userId = await getAuthUserId(ctx as AuthContext);
-      return userId || "anonymous";
+      const today = new Date().toISOString().split("T")[0];
+      return `${userId || "anonymous"}-${today}`;
     },
   });
 
@@ -535,8 +544,9 @@ export const assertNotOverLimitInternal = internalMutation({
         ? "anonymousDaily"
         : "authenticatedDaily";
 
+      const today = new Date().toISOString().split("T")[0];
       const dailyStatus = await rateLimiter.check(ctx, dailyLimitName, {
-        key: userId,
+        key: `${userId}-${today}`,
       });
 
       if (!dailyStatus.ok) {
@@ -566,8 +576,10 @@ export const incrementMessageCountInternal = internalMutation({
       const dailyLimitName = isAnonymous
         ? "anonymousDaily"
         : "authenticatedDaily";
+
+      const today = new Date().toISOString().split("T")[0];
       await rateLimiter.limit(ctx, dailyLimitName, {
-        key: userId,
+        key: `${userId}-${today}`,
         throws: true,
       });
     }

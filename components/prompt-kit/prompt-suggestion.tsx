@@ -66,7 +66,7 @@ function PromptSuggestion({
   return (
     <Button
       className={cn(
-        "w-full justify-start gap-0 rounded-xl py-2",
+        "h-auto w-full justify-start gap-0 whitespace-normal rounded-xl py-2",
         "hover:bg-accent",
         className
       )}
@@ -74,47 +74,51 @@ function PromptSuggestion({
       variant={variant || "ghost"}
       {...props}
     >
-      {shouldHighlight ? (
-        (() => {
-          const index = contentLower.indexOf(highlightLower);
-          if (index === -1)
-            return (
-              <span className="whitespace-pre-wrap text-muted-foreground">
-                {content}
-              </span>
+      <span className="w-full text-left">
+        {shouldHighlight ? (
+          (() => {
+            const index = contentLower.indexOf(highlightLower);
+            if (index === -1)
+              return (
+                <span className="whitespace-pre-wrap text-muted-foreground">
+                  {content}
+                </span>
+              );
+
+            const actualHighlightedText = content.substring(
+              index,
+              index + highlightLower.length
             );
 
-          const actualHighlightedText = content.substring(
-            index,
-            index + highlightLower.length
-          );
+            const before = content.substring(0, index);
+            const after = content.substring(
+              index + actualHighlightedText.length
+            );
 
-          const before = content.substring(0, index);
-          const after = content.substring(index + actualHighlightedText.length);
-
-          return (
-            <>
-              {before && (
-                <span className="whitespace-pre-wrap text-muted-foreground">
-                  {before}
+            return (
+              <>
+                {before && (
+                  <span className="whitespace-pre-wrap text-muted-foreground">
+                    {before}
+                  </span>
+                )}
+                <span className="whitespace-pre-wrap font-medium text-primary">
+                  {actualHighlightedText}
                 </span>
-              )}
-              <span className="whitespace-pre-wrap font-medium text-primary">
-                {actualHighlightedText}
-              </span>
-              {after && (
-                <span className="whitespace-pre-wrap text-muted-foreground">
-                  {after}
-                </span>
-              )}
-            </>
-          );
-        })()
-      ) : (
-        <span className="whitespace-pre-wrap text-muted-foreground">
-          {content}
-        </span>
-      )}
+                {after && (
+                  <span className="whitespace-pre-wrap text-muted-foreground">
+                    {after}
+                  </span>
+                )}
+              </>
+            );
+          })()
+        ) : (
+          <span className="whitespace-pre-wrap text-muted-foreground">
+            {content}
+          </span>
+        )}
+      </span>
     </Button>
   );
 }

@@ -30,7 +30,7 @@ const PROVIDER_CONFIGS = [
     id: "tavily" as const,
     title: "Tavily API Key",
     placeholder: "tvly-...",
-    docs: "https://tavily.com/",
+    docs: "https://app.tavily.com/home",
   },
 ] as const;
 
