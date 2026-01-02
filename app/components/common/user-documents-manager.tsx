@@ -15,6 +15,7 @@ import { useQuery } from "convex/react";
 import { useCallback, useState } from "react";
 import { toast as sonnerToast } from "sonner";
 import { useDriveConnection } from "@/app/hooks/use-drive-connection";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 // UI toasts for upload flows removed
 import {
@@ -349,13 +350,20 @@ export function UserDocumentsManager() {
             ) : (
               <Cloud className="size-5 text-muted-foreground" weight="fill" />
             )}
-            Google Drive
+            <span>Google Drive</span>
+            <Badge className="rounded-full" variant="secondary">
+              Experimental
+            </Badge>
           </CardTitle>
           <CardDescription>
             {isConnected
               ? `Connected as ${driveEmail ?? "your account"}`
               : "Connect your Google Drive to index PDF documents"}
           </CardDescription>
+          <div className="mt-2 flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-destructive text-sm">
+            <Warning className="mt-0.5 size-4 shrink-0" weight="fill" />
+            <p>Only upload a 1-3 page document.</p>
+          </div>
         </CardHeader>
         <CardContent>
           {isConnected ? (

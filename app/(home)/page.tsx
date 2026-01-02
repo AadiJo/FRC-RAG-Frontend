@@ -244,7 +244,7 @@ export default function Home() {
                       Shared chat
                     </p>
                     <p className="font-semibold text-sm sm:text-base">
-                      Electronic Specifications
+                      Ground Intake Specifications
                     </p>
                   </div>
                 </div>
@@ -259,15 +259,15 @@ export default function Home() {
                   <div className="space-y-1">
                     <p className="text-white/60 text-xs sm:text-sm">Query</p>
                     <p className="font-medium text-sm sm:text-base">
-                      "What is the pin spacing on the 2025 game piece sensor?"
+                      "How have teams made ground intakes for balls?"
                     </p>
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-white/80 text-xs leading-relaxed sm:p-4 sm:text-sm">
                   <p>
-                    According to rule R704, the 2025 Game Piece Sensor is
-                    required to use a 3-pin JST-PH style connector with a 2.00
-                    mm pin spacing. This pin...
+                    This drawing shows a funnel‑style intake that collects balls
+                    from the ground and guides them into a conveyor system. It
+                    is designed to be mounted at the front bumper and is...
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 text-white/70 text-xs sm:grid-cols-2 sm:text-sm">
@@ -275,7 +275,7 @@ export default function Home() {
                     <p className="text-[11px] text-white/50 uppercase tracking-wide sm:text-xs">
                       Uploads
                     </p>
-                    <p className="font-semibold">Manual.pdf</p>
+                    <p className="font-semibold">robo-2022.pdf</p>
                   </div>
                   <div className="rounded-xl border border-white/5 bg-white/5 p-3 sm:p-4">
                     <p className="text-[11px] text-white/50 uppercase tracking-wide sm:text-xs">
