@@ -12,7 +12,7 @@ import type {
 
 // Google API configuration
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const PICKER_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY ?? "";
 
 // Script loading state
@@ -110,10 +110,6 @@ export function useDriveConnection(): UseDriveConnectionReturn {
         }
 
         const expiresAt = Date.now() + response.expires_in * 1000;
-        // Avoid logging full token; log length and masked preview
-        const tokenPreview = response.access_token
-          ? `${response.access_token.slice(0, 6)}...${response.access_token.slice(-6)} (len=${response.access_token.length})`
-          : "null";
         // obtained access token (masked)
         setAccessToken(response.access_token);
         setTokenExpiresAt(expiresAt);
