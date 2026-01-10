@@ -32,9 +32,14 @@ export function ButtonSearch({
 }: ButtonSearchProps) {
   // Use 640px as the mobile breakpoint (Tailwind 'sm')
   const isMobile = useBreakpoint(768);
-  const isToolCallingAvailable = MODELS_OPTIONS.find(
-    (m) => m.id === model
-  )?.features?.find((f) => f.id === "tool-calling")?.enabled;
+
+  const selectedModelConfig = MODELS_OPTIONS.find((m) => m.id === model);
+  const isToolCallingAvailable = selectedModelConfig?.features?.find(
+    (f) => f.id === "tool-calling"
+  )?.enabled;
+
+  // Web search is only toggleable for OpenRouter-routed models.
+  const isOpenRouterModel = selectedModelConfig?.provider === "openrouter";
 
   // Compute classes for the enabled button state without nested ternaries
   let enabledButtonClass = "";
@@ -71,6 +76,34 @@ export function ButtonSearch({
           </span>
         </TooltipTrigger>
         <TooltipContent>This model does not support web search.</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  if (!isOpenRouterModel) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              aria-label="Search the internet"
+              className={
+                isMobile
+                  ? "h-9 w-auto cursor-not-allowed rounded-full px-3 opacity-50"
+                  : "size-9 cursor-not-allowed rounded-full opacity-50"
+              }
+              disabled
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Globe className="size-5" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          Web search can only be enabled on OpenRouter models.
+        </TooltipContent>
       </Tooltip>
     );
   }

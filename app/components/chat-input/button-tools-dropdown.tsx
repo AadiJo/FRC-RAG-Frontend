@@ -37,13 +37,21 @@ function BaseButtonToolsDropdown({
 }: ButtonToolsDropdownProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isToolCallingAvailable = useMemo(
-    () =>
-      MODELS_OPTIONS.find((m) => m.id === selectedModel)?.features?.find(
-        (f) => f.id === "tool-calling"
-      )?.enabled === true,
+  const selectedModelConfig = useMemo(
+    () => MODELS_OPTIONS.find((m) => m.id === selectedModel),
     [selectedModel]
   );
+
+  const isToolCallingAvailable = useMemo(
+    () =>
+      selectedModelConfig?.features?.find((f) => f.id === "tool-calling")
+        ?.enabled === true,
+    [selectedModelConfig]
+  );
+
+  // Web search is only supported/toggleable for models routed through OpenRouter.
+  const isOpenRouterModel = selectedModelConfig?.provider === "openrouter";
+  const canToggleSearch = isToolCallingAvailable && isOpenRouterModel;
 
   // Auth gating: mirror existing pattern from ButtonSearch
   if (!isUserAuthenticated) {
@@ -125,9 +133,10 @@ function BaseButtonToolsDropdown({
       >
         <DropdownMenuItem
           className="m-1.5 rounded-lg px-3 py-2 focus:bg-white/10"
+          disabled={!canToggleSearch}
           onSelect={(e) => {
             e.preventDefault();
-            if (!isToolCallingAvailable) {
+            if (!canToggleSearch) {
               return;
             }
             onToggleSearch();
@@ -143,7 +152,7 @@ function BaseButtonToolsDropdown({
               aria-label="Toggle web search"
               checked={searchEnabled}
               className="pointer-events-none"
-              disabled={!isToolCallingAvailable}
+              disabled={!canToggleSearch}
             />
           </div>
         </DropdownMenuItem>

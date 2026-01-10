@@ -2,7 +2,7 @@
 
 import { useChatActions, useChatStatus } from "@ai-sdk-tools/store";
 import { ArrowUp, Globe, Square, X } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PromptInput,
   PromptInputAction,
@@ -17,6 +17,7 @@ import {
   UPLOAD_MAX_BYTES,
   UPLOAD_MAX_LABEL,
 } from "@/lib/config/upload";
+import { MODELS_OPTIONS } from "@/lib/config";
 import { ButtonFileUpload } from "./button-file-upload";
 import { ButtonToolsDropdown } from "./button-tools-dropdown";
 import { FileList } from "./file-list";
@@ -72,6 +73,18 @@ export function ChatInput({
   // Local state for input value to prevent parent re-renders
   const [value, setValue] = useState(initialValue);
   const [searchEnabled, setSearchEnabled] = React.useState(false);
+
+  const isOpenRouterModel = useMemo(() => {
+    const modelConfig = MODELS_OPTIONS.find((m) => m.id === selectedModel);
+    return modelConfig?.provider === "openrouter";
+  }, [selectedModel]);
+
+  // If user switches to a non-OpenRouter model, force web search off.
+  useEffect(() => {
+    if (!isOpenRouterModel && searchEnabled) {
+      setSearchEnabled(false);
+    }
+  }, [isOpenRouterModel, searchEnabled]);
   const toggleSearch = useCallback(() => {
     setSearchEnabled((prev) => !prev);
   }, []);
@@ -101,11 +114,13 @@ export function ChatInput({
 
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        onSendAction(value, { enableSearch: searchEnabled });
+        onSendAction(value, {
+          enableSearch: searchEnabled && isOpenRouterModel,
+        });
         setValue(""); // Clear input after sending
       }
     },
-    [onSendAction, isStreaming, searchEnabled, value]
+    [onSendAction, isStreaming, searchEnabled, value, isOpenRouterModel]
   );
 
   const handleMainClick = () => {
@@ -123,7 +138,9 @@ export function ChatInput({
       return;
     }
 
-    onSendAction(value, { enableSearch: searchEnabled });
+    onSendAction(value, {
+      enableSearch: searchEnabled && isOpenRouterModel,
+    });
     setValue(""); // Clear input after sending
   };
 

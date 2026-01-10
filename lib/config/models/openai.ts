@@ -1,3 +1,4 @@
+import { TOOL_CALLING_FEATURE } from "../features";
 import { openrouter } from "../openrouter";
 
 export const OPENAI_MODELS = [
@@ -12,6 +13,6 @@ export const OPENAI_MODELS = [
     description: "OpenAI GPT OSS 20B (free tier on OpenRouter).",
     apiKeyUsage: { allowUserKey: false, userKeyOnly: false },
     api_sdk: openrouter("openai/gpt-oss-20b:free"),
-    features: [],
+    features: [TOOL_CALLING_FEATURE],
   },
 ];

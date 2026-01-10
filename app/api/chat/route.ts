@@ -354,6 +354,10 @@ export async function POST(req: Request) {
       return createErrorResponse(new Error("Invalid 'model' provided."));
     }
 
+    // Web search is only supported for models routed through OpenRouter.
+    const effectiveEnableSearch =
+      enableSearch === true && selectedModel.provider === "openrouter";
+
     const selectedModelSupportsReasoning =
       selectedModel.features?.some(
         (feature) => feature.id === "reasoning" && feature.enabled === true
@@ -480,7 +484,7 @@ export async function POST(req: Request) {
           token,
           selectedModel.id,
           selectedModel.name,
-          enableSearch,
+          effectiveEnableSearch,
           reasoningEffort
         );
       }
@@ -540,7 +544,7 @@ export async function POST(req: Request) {
           token,
           selectedModel.id,
           selectedModel.name,
-          enableSearch,
+          effectiveEnableSearch,
           reasoningEffort
         );
       }
@@ -631,7 +635,7 @@ export async function POST(req: Request) {
       finalSystemPrompt = buildSystemPrompt(
         user,
         basePrompt,
-        enableSearch,
+        effectiveEnableSearch,
         enableTools,
         userInfo?.timezone
       );
@@ -730,7 +734,7 @@ export async function POST(req: Request) {
     const baseMetadata = {
       modelId: selectedModel.id,
       modelName: selectedModel.name,
-      includeSearch: enableSearch,
+      includeSearch: effectiveEnableSearch,
       reasoningEffort: reasoningEffort || "none",
     };
     let finalUsage = {
@@ -760,7 +764,7 @@ export async function POST(req: Request) {
 
           const toolset: Record<string, Tool> = {};
 
-          if (enableSearch) {
+          if (effectiveEnableSearch) {
             toolset.search = searchTool;
           }
 
@@ -798,7 +802,7 @@ export async function POST(req: Request) {
                       token,
                       selectedModel.id,
                       selectedModel.name,
-                      enableSearch,
+                      effectiveEnableSearch,
                       reasoningEffort
                     );
                     errorMessageSaved = true; // Mark that error message was saved
@@ -819,7 +823,7 @@ export async function POST(req: Request) {
                     token,
                     selectedModel.id,
                     selectedModel.name,
-                    enableSearch,
+                    effectiveEnableSearch,
                     reasoningEffort
                   );
                   errorMessageSaved = true; // Mark that error message was saved
@@ -873,7 +877,7 @@ export async function POST(req: Request) {
                   token,
                   selectedModel.id,
                   selectedModel.name,
-                  enableSearch,
+                  effectiveEnableSearch,
                   reasoningEffort
                 );
               }
@@ -899,7 +903,7 @@ export async function POST(req: Request) {
                     token,
                     selectedModel.id,
                     selectedModel.name,
-                    enableSearch,
+                    effectiveEnableSearch,
                     reasoningEffort
                   );
                 }
@@ -920,7 +924,7 @@ export async function POST(req: Request) {
                 token,
                 selectedModel.id,
                 selectedModel.name,
-                enableSearch,
+                effectiveEnableSearch,
                 reasoningEffort
               );
             }
@@ -1032,7 +1036,7 @@ export async function POST(req: Request) {
             token,
             selectedModel.id,
             selectedModel.name,
-            enableSearch,
+            effectiveEnableSearch,
             reasoningEffort
           );
           return;

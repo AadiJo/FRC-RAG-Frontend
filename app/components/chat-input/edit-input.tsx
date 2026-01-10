@@ -2,7 +2,7 @@
 
 import { ArrowUpIcon } from "@phosphor-icons/react";
 import type React from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEditClickOutside } from "@/app/hooks/use-edit-click-outside";
 import {
   PromptInput,
@@ -11,7 +11,7 @@ import {
   PromptInputTextarea,
 } from "@/components/prompt-kit/prompt-input";
 import { Button } from "@/components/ui/button";
-import { MODEL_DEFAULT, MODELS_MAP } from "@/lib/config";
+import { MODEL_DEFAULT, MODELS_MAP, MODELS_OPTIONS } from "@/lib/config";
 import { ButtonFileUpload } from "./button-file-upload";
 import { ButtonSearch } from "./button-search";
 import { FileList } from "./file-list";
@@ -83,6 +83,18 @@ export function EditInput({
     useState<ReasoningEffort>(reasoningEffort);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const editContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const editIsOpenRouterModel = useMemo(() => {
+    const modelConfig = MODELS_OPTIONS.find((m) => m.id === editModel);
+    return modelConfig?.provider === "openrouter";
+  }, [editModel]);
+
+  // Force search off if the user switches to a non-OpenRouter model.
+  useEffect(() => {
+    if (!editIsOpenRouterModel && editSearchEnabled) {
+      setEditSearchEnabled(false);
+    }
+  }, [editIsOpenRouterModel, editSearchEnabled]);
 
   // Click outside to cancel (ignores portal elements like dropdowns)
   useEditClickOutside(editContainerRef, onCancel);
@@ -160,7 +172,7 @@ export function EditInput({
       .map((f) => f.url.split("?")[0])
       .filter((u) => !keptExistingUrls.has(u));
     onSend(value, {
-      enableSearch: editSearchEnabled,
+      enableSearch: editSearchEnabled && editIsOpenRouterModel,
       model: editModel,
       files: editFiles,
       reasoningEffort: editReasoningEffort,
@@ -171,6 +183,7 @@ export function EditInput({
     editFiles,
     onSend,
     editSearchEnabled,
+    editIsOpenRouterModel,
     editModel,
     editReasoningEffort,
     hasChanges,

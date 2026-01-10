@@ -50,6 +50,7 @@ import {
 } from "@/lib/message-utils";
 import {
   createModelValidator,
+  getModelProvider,
   supportsReasoningEffort,
 } from "@/lib/model-utils";
 import { TRANSITION_LAYOUT } from "@/lib/motion";
@@ -792,6 +793,11 @@ function ChatContent() {
       }
 
       const isReasoningModel = supportsReasoningEffort(selectedModel);
+      const isOpenRouterModel = getModelProvider(selectedModel) === "openrouter";
+      const normalizedEnableSearch =
+        typeof options?.enableSearch === "boolean"
+          ? options.enableSearch && isOpenRouterModel
+          : undefined;
       const timezone = getUserTimezone();
 
       const body: ChatBody = {
@@ -799,8 +805,8 @@ function ChatContent() {
         model: selectedModel,
         personaId,
         enableRAG: true, // Enable RAG by default for FRC
-        ...(typeof options?.enableSearch !== "undefined"
-          ? { enableSearch: options.enableSearch }
+        ...(typeof normalizedEnableSearch !== "undefined"
+          ? { enableSearch: normalizedEnableSearch }
           : {}),
         ...(isReasoningModel ? { reasoningEffort } : {}),
         ...(timezone ? { userInfo: { timezone } } : {}),
